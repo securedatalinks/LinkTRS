@@ -4,7 +4,6 @@ import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
 import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
-import Paper from '@material-ui/core/Paper';
 import { Link as RouterLink } from "react-router-dom"
 import '../css/Table.css';
 
@@ -14,12 +13,9 @@ function createData(wireframe, accMargin, term, minMargin, notionalVal, assetVal
 
 const rows = [
   createData('20s', '5%', 5, '10%', 100, 1000),
-  createData('20s', '5%', 5, '10%', 100, 1000),
-  createData('20s', '5%', 5, '10%', 100, 1000),
-  createData('20s', '5%', 5, '10%', 100, 1000),
 ];
 
-class CustomTable extends Component {
+class ContractsTable extends Component {
   state = {
     minutes: 3,
     seconds: 0
@@ -91,4 +87,4 @@ class CustomTable extends Component {
   }
 }
 
-export default (CustomTable);
+export default (ContractsTable);
