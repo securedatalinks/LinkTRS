@@ -4,6 +4,21 @@ import "chainlink/contracts/interfaces/AggregatorInterface.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "openzeppelin-solidity/contracts/Math/SafeMath.sol";
 
+/**
+ * @dev Interface of the ERC20 standard as defined in the EIP. Does not include
+ * the optional functions; to access them see {ERC20Detailed}.
+ */
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
 contract LinkTRS is Ownable {
     
     //Struct for a user account
@@ -11,14 +26,13 @@ contract LinkTRS is Ownable {
         address owner;
         bytes32[] contracts;
         uint256 numContracts;
-        uint256 deposited; //total DAI deposited
-        uint256 inContracts; //total DAI locked up in contracts
+        uint256 deposited; //total cDAI deposited
     }
 
     struct npvCalcs {
         uint256 date;
         uint256 price;
-        uint256 takerMargin;
+        uint256 takersMargin;
         uint256 makersMargin;
         uint256 npv; //change in npv
     }
@@ -43,15 +57,18 @@ contract LinkTRS is Ownable {
     event ContractCreated(bytes32 contractID);
     event npvUpdated(bytes32 contractID);
     event priceChangeEvent(int priceChange);
+    event AttemptTransfer(address from, address to, uint value);
 
     AggregatorInterface internal reference;
     mapping(address => account) users;
     mapping (bytes32 => trsContract) contracts;
     mapping (bytes32 => bool) validContracts;
     uint256 contractCounter;
+    IERC20 token;
 
-    constructor(address _linkToken, address _aggregator) public {
+    constructor(address tokenAddress, address _aggregator) public {
         reference = AggregatorInterface(_aggregator);
+        token = IERC20(tokenAddress);
     }
 
     /**
@@ -115,16 +132,17 @@ contract LinkTRS is Ownable {
         return users[msg.sender].contracts[i];
     }
 
-    function getContractInfo(bytes32 _contractID) public view returns (address, address, uint256, uint256, uint256, uint16, uint256) {
+    function getContractInfo(bytes32 _contractID) public view returns (address, address, uint256, uint256, uint256, 
+    uint16, uint256, uint256, uint256) {
         require(validContracts[_contractID], "Please use a valid contract ID");
         trsContract memory _contract = contracts[_contractID];
         return (_contract.takerAddress, _contract.makerAddress, _contract.originalPrice, _contract.startDate,
-             _contract.expiryDate, _contract.interest, _contract.originalValue);
+             _contract.expiryDate, _contract.interest, _contract.originalValue, _contract.takersMargin, _contract.makersMargin);
     }
 
     function getContractNPV(bytes32 _contractID, uint i) public view returns (uint256, uint256, uint256, uint256, uint256) {
         npvCalcs memory thisNPV = contracts[_contractID].npvs[i];
-        return (thisNPV.date, thisNPV.price, thisNPV.takerMargin, thisNPV.makersMargin, thisNPV.npv);
+        return (thisNPV.date, thisNPV.price, thisNPV.takersMargin, thisNPV.makersMargin, thisNPV.npv);
     }
 
     /**
@@ -151,7 +169,7 @@ contract LinkTRS is Ownable {
         //this is to account for the fact that the price is increased this much before being written on chain
         
         // //TODO incoperate margin changes here
-        npvCalcs memory thisCalc = npvCalcs(now, scaledPrice, lastNPV.takerMargin, lastNPV.makersMargin, scaledNpv);
+        npvCalcs memory thisCalc = npvCalcs(now, scaledPrice, lastNPV.takersMargin, lastNPV.makersMargin, scaledNpv);
         contracts[_contractId].npvs.push(thisCalc);
         contracts[_contractId].numNPV++;
 
@@ -162,7 +180,7 @@ contract LinkTRS is Ownable {
              
         // } else {
         //     //Price has gone down, transfer from taker margin to maker margin
-        //    //return npvCalcs(now, price, lastNPV.takerMargin, lastNPV.makersMargin, npv);
+        //    //return npvCalcs(now, price, lastNPV.takersMargin, lastNPV.makersMargin, npv);
         // }
     }
 
@@ -189,6 +207,35 @@ contract LinkTRS is Ownable {
         } else {
             return (uint256)(num);
         }
+    }
+
+    /**
+    * Allows a user to deposit tokens onto the platform
+    */
+    function deposit(uint value, bytes32 _contractID) public returns (bool) {
+        require(validContracts[_contractID], "Please use a valid contract ID");
+        emit AttemptTransfer(msg.sender, address(this), value);
+        require(token.transferFrom(msg.sender, address(this), value), "Token transfer must succeed");
+        trsContract memory _contract = contracts[_contractID];
+        if (msg.sender == _contract.takerAddress) {
+            contracts[_contractID].takersMargin = SafeMath.add(contracts[_contractID].takersMargin, value);
+        } else {
+            contracts[_contractID].makersMargin = SafeMath.add(contracts[_contractID].makersMargin, value);
+        }
+        users[msg.sender].deposited = SafeMath.add(users[msg.sender].deposited, value);
+        return true;
+    }
+
+    function withdraw(uint value, bytes32 _contractID) public returns(bool) {
+        require(validContracts[_contractID], "Please use a valid contract ID");
+        trsContract memory _contract = contracts[_contractID];
+        if (msg.sender == _contract.takerAddress) {
+            require(contracts[_contractID].takersMargin >= value, "You can only withdraw an amount you have deposited");
+        } else {
+            require(contracts[_contractID].makersMargin >= value, "You can only withdraw an amount you have deposited");
+        }
+        //TODO two party vote to withdraw
+        require(token.transfer(msg.sender, value), "Token transfer must succeed");
     }
 
 }
