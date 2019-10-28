@@ -28,10 +28,10 @@ class CustomAppBar extends Component {
               justifyContent: "center", marginRight: '30px'}}
               alt={"Vigeo Logo - We Provide A Chainlink Reputation Service"} />
               <List component="nav" style={{marginRight: 0, marginLeft: "auto", display: 'flex', flexDirection: 'row', padding: 0, width: "50%"}}>
-                <ListItem label="Home" to='/' component={Link} className = "link">
+                <ListItem label="Home" to='/create' component={Link} className = "link">
                   <Typography variant="subtitle2"> New Contract </Typography>
                 </ListItem>
-                <ListItem label="Home" to='/' component={Link} className = "link">
+                <ListItem label="Home" to='/myaccount' component={Link} className = "link">
                   <Typography variant="subtitle2"> My Account </Typography>
                 </ListItem>
                 <ListItem label="Home" to='/' component={Link} className = "link">
