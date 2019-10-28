@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { Route, Switch } from 'react-router-dom';
 import MainPage from "./pages/MainPage";
 import NotFoundPage from "./pages/404";
+import CreateContractPage from "./pages/CreateContractPage";
 import './App.css';
 import MyAccount from './pages/MyAccount';
 
@@ -13,6 +14,9 @@ class App extends Component {
           <Switch>
             <Route exact path="/" render={(props) => {
               return (<MainPage {...props}/>)
+            }} />
+            <Route render={(props) => {
+              return (<CreateContractPage {...props} />)
             }} />
             <Route render={(props) => {
               return (<NotFoundPage {...props} />)
