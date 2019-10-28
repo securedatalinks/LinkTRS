@@ -4,6 +4,7 @@ import MainPage from "./pages/MainPage";
 import NotFoundPage from "./pages/404";
 import CreateContractPage from "./pages/CreateContractPage";
 import './App.css';
+import MyAccount from './pages/MyAccount';
 
 class App extends Component {
 
@@ -23,6 +24,7 @@ class App extends Component {
             <Route render={(props) => {
               return (<NotFoundPage {...props} />)
             }} />
+
           </Switch>
         </div>
     );
