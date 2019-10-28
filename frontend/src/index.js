@@ -46,7 +46,7 @@ ReactDOM.render(
     <MuiThemeProvider theme={theme}>
         <CssBaseline />
         <App />
-        <Footer/>
+        <Footer />
       </MuiThemeProvider>
   </BrowserRouter >,
   document.getElementById('root'));
