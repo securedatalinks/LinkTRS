@@ -3,6 +3,7 @@ import { Route, Switch } from 'react-router-dom';
 import MainPage from "./pages/MainPage";
 import NotFoundPage from "./pages/404";
 import './App.css';
+import MyAccount from './pages/MyAccount';
 
 class App extends Component {
 
@@ -15,6 +16,9 @@ class App extends Component {
             }} />
             <Route render={(props) => {
               return (<NotFoundPage {...props} />)
+            }} />
+             <Route exact path="/" render={(props) => {
+              return (<MyAccount {...props}/>)
             }} />
           </Switch>
         </div>
