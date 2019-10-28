@@ -1,5 +1,5 @@
 import React, { Component } from "react";
-import CreateContractForm from "../components/CreateContractForm";
+import CreateContractForm from "../components/CreateContractForm/CreateContractForm";
 
 class CreateContractPage extends Component {
 
