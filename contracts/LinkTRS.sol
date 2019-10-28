@@ -55,9 +55,12 @@ contract LinkTRS is Ownable {
     }
 
     event ContractCreated(bytes32 contractID);
+    event Liquidate(bytes32 _contractID);
     event npvUpdated(bytes32 contractID);
     event priceChangeEvent(int priceChange);
     event AttemptTransfer(address from, address to, uint value);
+    event TestEmit(uint interest, uint priceDiff);
+    event amountToPay(uint tokens);
 
     AggregatorInterface internal reference;
     mapping(address => account) users;
@@ -94,20 +97,20 @@ contract LinkTRS is Ownable {
 
     function createContract(uint256 length, uint16 interest, uint16 requiredMargin, uint256 amountOfLink) public returns (bytes32) {
         //Pull required info
-        uint256 price = getLatestPrice();
-        uint256 scaledPrice = SafeMath.div(price, 1000000); //this converts it to price ($ x 1000) eg $1.24 = 1240
+        uint256 price = getLatestPrice(); //price (x 10^9)
+        //uint256 scaledPrice = SafeMath.div(price, 1000000); //this converts it to price ($ x 1000) eg $1.24 = 1240
         bytes32 contractID = keccak256(contractCounter);
         uint256 expiryDate = now + length * 1 days;
-        //uint256 value = SafeMath.div(SafeMath.mul(amountOfLink, price), 1000000);
-        uint256 value = SafeMath.mul(amountOfLink, scaledPrice);
+        //uint256 value = SafeMath.mul(amountOfLink, scaledPrice);
+        uint256 value = SafeMath.mul(amountOfLink, price);
         //Create initial npv entry
-        npvCalcs memory npvEntry = npvCalcs(now, scaledPrice, 0, 0, 0);
+        npvCalcs memory npvEntry = npvCalcs(now, price, 0, 0, 0);
 
         //Create contract
         contracts[contractID].id = contractID;
         contracts[contractID].takerAddress = address(0);
         contracts[contractID].makerAddress = msg.sender;
-        contracts[contractID].originalPrice = scaledPrice;
+        contracts[contractID].originalPrice = price;
         contracts[contractID].expiryDate = expiryDate;
         contracts[contractID].startDate = now;
         contracts[contractID].interest = interest;
@@ -151,37 +154,52 @@ contract LinkTRS is Ownable {
     */
     function calcNPV(bytes32 _contractId) internal returns (bool) {
         //Calc npv
-        uint256 price = getLatestPrice();
-        uint256 scaledPrice = SafeMath.div(price, 1000000); //this converts it to price ($ x 1000) eg $1.24 = 1240
+        uint256 price = getLatestPrice(); //price * 10^9
+        //uint256 scaledPrice = SafeMath.div(price, 1000000); //this converts it to price ($ x 1000) eg $1.24 = 1240
 
         trsContract memory _contract = contracts[_contractId];
 
         npvCalcs memory lastNPV = contracts[_contractId].npvs[contracts[_contractId].numNPV - 1];
-        int256 priceChange = (int256)(scaledPrice - lastNPV.price);
+        int256 priceChange = (int256)(price - lastNPV.price);
         emit priceChangeEvent(priceChange);
         uint256 absPriceChange = abs(priceChange);
-        uint256 timeChange = SafeMath.div(SafeMath.sub(now + 31536000, lastNPV.date), 86400); //for testing pretend a year has past
-        uint256 npv = SafeMath.mul(SafeMath.sub(absPriceChange,SafeMath.div(SafeMath.mul(SafeMath.div(365, 365), _contract.interest), 1000)),
+        //uint256 timeChange = SafeMath.div(SafeMath.sub(now + 31536000, lastNPV.date), 86400); //for testing pretend a year has past
+        //Interest is represented as percent x 1000 (i.e 5.5% = 5500)
+        uint256 interestPercent = SafeMath.div(SafeMath.mul(SafeMath.div(36500, 365), _contract.interest), 1);
+
+        //At this point, price diff is (price diff) * 10^7 and interest is % * 10^2. Want percent as a decimal * 10^7 (i.e % in 10^)
+        //eg (5.5% should be 0.05500 * 10^7 = 5500 * 10^2)
+        emit TestEmit(interestPercent, absPriceChange);
+        uint256 npv = SafeMath.mul(SafeMath.sub(absPriceChange,interestPercent),
             _contract.originalValue);
         //this is to account for the fact that the price is increased this much before being written on chain
-        uint256 scaledNpv = SafeMath.div(npv, 100); //This is to account for interest percent being represented as a whole number
-        //uint256 scaledNpv = SafeMath.div(npv, 1000); //remove excess from interest being x1000
-        //this is to account for the fact that the price is increased this much before being written on chain
+        uint256 scaledNpv = SafeMath.div(npv, 100000000); //remove excess from interest being x1000
         
         // //TODO incoperate margin changes here
-        npvCalcs memory thisCalc = npvCalcs(now, scaledPrice, lastNPV.takersMargin, lastNPV.makersMargin, scaledNpv);
+        npvCalcs memory thisCalc = npvCalcs(now, price, lastNPV.takersMargin, lastNPV.makersMargin, scaledNpv);
         contracts[_contractId].npvs.push(thisCalc);
         contracts[_contractId].numNPV++;
 
         emit npvUpdated(_contractId);
 
-        // if(priceChange > 0) {
-        //     //Price has gone up, transfer from maker margin to taker margin
-             
-        // } else {
-        //     //Price has gone down, transfer from taker margin to maker margin
-        //    //return npvCalcs(now, price, lastNPV.takersMargin, lastNPV.makersMargin, npv);
-        // }
+        //TODO Calc amount of tokens to transfer
+        //npv is excess to pay in $x.xx * 10^8.
+        uint amountOfTokens = SafeMath.mul(SafeMath.div(SafeMath.div(SafeMath.mul(npv,1000),price), 1000), 10000000000);
+        //Now to convert to tokens (which are in 10^18), we need to multiply by 10^11 (since we are currently working in 10^9)
+        emit amountToPay(amountOfTokens);
+
+        if(priceChange > 0) {
+            //Price has gone up, transfer from maker margin to taker margin
+            if (_contract.makersMargin < amountOfTokens) {
+                liquidate(_contractId);
+            }
+        } else {
+            //Price has gone down, transfer from taker margin to maker margin
+            if (_contract.takersMargin < amountOfTokens) {
+                liquidate(_contractId);
+            }
+           //return npvCalcs(now, price, lastNPV.takersMargin, lastNPV.makersMargin, npv);
+        }
     }
 
     /**
@@ -189,7 +207,6 @@ contract LinkTRS is Ownable {
     */
     function remargin(bytes32 _contractId) public returns(bool) {
         require(validContracts[_contractId], "You can only remargin a valid contract");
-
         calcNPV(_contractId);
         return true;
     }
@@ -198,6 +215,7 @@ contract LinkTRS is Ownable {
     * Function for liquidating a contract
     */
     function liquidate(bytes32 _contractId) public {
+        emit Liquidate(_contractId);
         return;
     }
 
