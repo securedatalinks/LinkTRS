@@ -11,7 +11,7 @@ module.exports = (deployer, network) => {
         return deployer.deploy(LinkTRS, LinkToken.address, DemoAggregator.address)
       })
     })
-  }
+  } 
   else if (network.startsWith('ropsten')) {
     return deployer.deploy(LinkTRS, "0x20fe562d797a42dcb3399062ae9546cd06f63280", "0x060b38B197fE60cA5F36EA94452DA7F1bc3c7823")
   } else {
