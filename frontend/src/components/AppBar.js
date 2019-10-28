@@ -34,7 +34,7 @@ class CustomAppBar extends Component {
                 <ListItem label="Home" to='/' component={Link} className = "link">
                   <Typography variant="subtitle2"> New Contract </Typography>
                 </ListItem>
-                <ListItem label="Home" to='/' component={Link} className = "link">
+                <ListItem label="Home" to='/myaccount' component={Link} className = "link">
                   <Typography variant="subtitle2"> My Account </Typography>
                 </ListItem>
                 <ListItem label="Home" to='/' component={Link} className = "link">

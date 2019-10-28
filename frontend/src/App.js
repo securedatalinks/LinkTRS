@@ -15,15 +15,16 @@ class App extends Component {
             <Route exact path="/" render={(props) => {
               return (<MainPage {...props}/>)
             }} />
-            <Route render={(props) => {
+            <Route exact path="/" render={(props) => {
               return (<CreateContractPage {...props} />)
+            }} />
+            <Route exact path="/myaccount" render={(props) => {
+              return (<MyAccount {...props}/>)
             }} />
             <Route render={(props) => {
               return (<NotFoundPage {...props} />)
             }} />
-             <Route exact path="/" render={(props) => {
-              return (<MyAccount {...props}/>)
-            }} />
+             
           </Switch>
         </div>
     );

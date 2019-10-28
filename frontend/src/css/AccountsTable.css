@@ -1,0 +1,12 @@
+
+.accountstable-container {
+    padding-top: 10%;
+    width: 90%;
+    margin: 0 auto;
+    padding-bottom: 10%;
+  }
+  
+  .accountstable-container .accountstable {
+    width: 100%;
+  }
+  
