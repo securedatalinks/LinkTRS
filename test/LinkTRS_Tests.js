@@ -160,10 +160,10 @@ contract('LinkTRS', accounts => {
         )
         var contractID = await linkTRS.getUserContract(0);
         //Update contract price
-        await aggregator.increasePrice()
+        //await aggregator.increasePrice()
 
         //Remargin
-        await linkTRS.remargin(contractID)
+        await linkTRS.remargin(contractID, 110000000)
 
         //TODO test outcome of remargin
       })
@@ -183,10 +183,10 @@ contract('LinkTRS', accounts => {
         )
         var contractID = await linkTRS.getUserContract(0);
         //Update contract price
-        await aggregator.decreasePrice()
+        //await aggregator.decreasePrice()
 
         //Remargin
-        await linkTRS.remargin(contractID)
+        await linkTRS.remargin(contractID, 90000000)
 
         var npvBefore = await linkTRS.getContractNPV(contractID, 0);
         // console.log(npvBefore[0].toString())

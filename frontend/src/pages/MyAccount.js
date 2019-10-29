@@ -86,7 +86,8 @@ class MyAccount extends Component {
                     expiryDate: contractData[4],
                     interestRate: contractData[5],
                     mm: contractData[7],
-                    tm: contractData[8]
+                    tm: contractData[8],
+                    id: contractAddresses[i]
                 }
 
                 contractsData.push(thisData)
@@ -138,7 +139,7 @@ class MyAccount extends Component {
                 <MyAccountDisplay account={this.state.account} openContracts={this.state.data.length} 
                     deposited={this.props.web3.utils.fromWei(this.state.daiInContracts.toString())} daiBalance={this.state.accountBalance}
                 topUpTokens={this.topUpTokens} />
-                <AccountTable data={this.state.data} web3={this.props.web3} />
+                <AccountTable {...this.props} data={this.state.data} web3={this.props.web3} />
             </div>
         )
     }

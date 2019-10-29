@@ -69,6 +69,7 @@ contract LinkTRS is Ownable, ChainlinkClient {
     mapping(address => account) users;
     mapping (bytes32 => trsContract) contracts;
     mapping (bytes32 => bool) validContracts;
+    mapping (bytes32 => bytes32) requestToContract;
     uint256 public contractCounter;
     IERC20 token;
 
@@ -87,23 +88,23 @@ contract LinkTRS is Ownable, ChainlinkClient {
 
     //** Functions for Chainlink Requests */
     // Creates a Chainlink request with the uint256 multiplier job and returns the requestId
-    // function requestEthereumPrice(bytes32 _jobId, string _currency) public returns (bytes32 requestId) {
-    //     // newRequest takes a JobID, a callback address, and callback function as input
-    //     Chainlink.Request memory req = buildChainlinkRequest(_jobId, this, this.fulfillEthereumPrice.selector);
-    //     // Adds a URL with the key "get" to the request parameters
-    //     req.add("get", "https://min-api.cryptocompare.com/data/price?fsym=LINK&tsyms=DAI");
-    //     // Uses input param (dot-delimited string) as the "path" in the request parameters
-    //     req.add("path", _currency);
-    //     // Adds an integer with the key "times" to the request parameters
-    //     req.addInt("times", 100000000);
-    //     // Sends the request with 1 LINK to the oracle contract
-    //     requestId = sendChainlinkRequest(req, 1 * LINK);
-    // }
+    function requestEthereumPrice(bytes32 _contractID, bytes32 _jobId) public returns (bytes32 requestId) {
+        // newRequest takes a JobID, a callback address, and callback function as input
+        Chainlink.Request memory req = buildChainlinkRequest(_jobId, this, this.fulfillEthereumPrice.selector);
+        // Adds a URL with the key "get" to the request parameters
+        req.add("get", "https://min-api.cryptocompare.com/data/price?fsym=LINK&tsyms=DAI");
+        // Uses input param (dot-delimited string) as the "path" in the request parameters
+        req.add("path", "DAI");
+        // Adds an integer with the key "times" to the request parameters
+        req.addInt("times", 100000000);
+        // Sends the request with 1 LINK to the oracle contract
+        requestId = sendChainlinkRequest(req, 1 * LINK);
+    }
 
     // // Creates a Chainlink request with the uint256 multiplier job and returns the requestId
-    // function requestEthereumPriceFuture(bytes32 _jobId, string _currency, uint256 requestTime) public returns (bytes32 requestId) {
+    // function requestEthereumPriceFuture(bytes32 _contractID, bytes32 _jobId, string _currency, uint256 requestTime) public returns (bytes32 requestId) {
     //     // newRequest takes a JobID, a callback address, and callback function as input
-    //     Chainlink.Request memory req = buildChainlinkRequest(_jobId, this, this.fulfillEthereumPrice.selector);
+    //     Chainlink.Request memory req = buildChainlinkRequest(_jobId, this, this.fulfillEthereumPriceFuture.selector);
     //     // Adds a URL with the key "get" to the request parameters
     //     req.add("get", "https://min-api.cryptocompare.com/data/price?fsym=LINK&tsyms=DAI");
     //     // Uses input param (dot-delimited string) as the "path" in the request parameters
@@ -113,6 +114,16 @@ contract LinkTRS is Ownable, ChainlinkClient {
     //     req.add("runat", requestTime);
     //     // Sends the request with 1 LINK to the oracle contract
     //     requestId = sendChainlinkRequest(req, 1 * LINK);
+    // }
+
+    function fulfillEthereumPrice(bytes32 _requestId, uint256 _price) public recordChainlinkFulfillment(_requestId) {
+            bytes32 _contractID = requestToContract[_requestId];
+            require(validContracts[_contractID], "Invalid request");
+            remargin(_contractID, _price);
+    }
+
+    // function fulfillEthereumPriceFuture(bytes32 _requestId, uint256 _price) public recordChainlinkFulfillment(_requestId) {
+    //         //price = _price;
     // }
 
     /**
@@ -139,7 +150,6 @@ contract LinkTRS is Ownable, ChainlinkClient {
     function createContract(uint256 timeToLive, uint256 length, uint16 interest, uint16 requiredMargin, uint256 amountOfLink) public returns (bytes32) {        
         //Pull required info
         uint256 price = getLatestPrice(); //price (x 10^9)
-        //uint256 scaledPrice = SafeMath.div(price, 1000000); //this converts it to price ($ x 1000) eg $1.24 = 1240
         bytes32 contractID = keccak256(contractCounter);
         uint256 expiryDate = now + length * 1 days;
         uint256 offerExpiryDate = now + timeToLive * 1 minutes;
@@ -194,17 +204,17 @@ contract LinkTRS is Ownable, ChainlinkClient {
     }
 
     function getContractByIndex(uint index) public view returns (address, address, uint256, uint256, uint256, 
-    uint16, uint256, uint256, uint256, uint256) {
+    uint16, uint256, uint256, uint256, uint256, uint256) {
         return getContractInfo(keccak256(index));
     }
 
     function getContractInfo(bytes32 _contractID) public view returns (address, address, uint256, uint256, uint256, 
-    uint16, uint256, uint256, uint256, uint256) {
+    uint16, uint256, uint256, uint256, uint256, uint256) {
         require(validContracts[_contractID], "Please use a valid contract ID");
         trsContract memory _contract = contracts[_contractID];
         return (_contract.takerAddress, _contract.makerAddress, _contract.originalPrice, _contract.startDate,
              _contract.expiryDate, _contract.interest, _contract.originalValue, _contract.takersMargin, _contract.makersMargin,
-             _contract.offerExpiryDate);
+             _contract.offerExpiryDate, _contract.numNPV);
     }
 
     function getContractNPV(bytes32 _contractID, uint i) public view returns (uint256, uint256, uint256, uint256, uint256) {
@@ -216,9 +226,9 @@ contract LinkTRS is Ownable, ChainlinkClient {
     * Function for calculating the NPV at a given point in time for a specific contract.
     * @dev requires the starting state for the NVP array to be intilized (when contract is created)
     */
-    function calcNPV(bytes32 _contractId) internal returns (bool) {
+    function calcNPV(bytes32 _contractId, uint256 price) internal returns (bool) {
         //Calc npv
-        uint256 price = getLatestPrice(); //price * 10^9
+        //uint256 price = getLatestPrice(); //price * 10^9
         //uint256 scaledPrice = SafeMath.div(price, 1000000); //this converts it to price ($ x 1000) eg $1.24 = 1240
 
         trsContract memory _contract = contracts[_contractId];
@@ -269,10 +279,14 @@ contract LinkTRS is Ownable, ChainlinkClient {
     /**
     * Function for recalculating contract terms and the margin accounts for a set contract
     */
-    function remargin(bytes32 _contractId) public returns(bool) {
+    function remargin(bytes32 _contractId, uint256 price) public returns(bool) {
         require(validContracts[_contractId], "You can only remargin a valid contract");
-        calcNPV(_contractId);
+        calcNPV(_contractId, price);
         return true;
+    }
+
+    function requestRemargin(bytes32 _contractID) public returns(bool) {
+        requestEthereumPrice(_contractID, "e0fc58dc839a42808c3c51186f6f8381"); //make request to the SDL node
     }
 
     /**

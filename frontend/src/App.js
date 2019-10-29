@@ -9,6 +9,7 @@ import Typography from '@material-ui/core/Typography';
 import { PulseLoader } from 'react-spinners';
 
 import getWeb3 from './utils/getWeb3'
+import ViewContractPage from './pages/ViewContractPage';
 
 class App extends Component {
   state = {
@@ -62,6 +63,9 @@ class App extends Component {
               }} />
               <Route exact path="/myaccount" render={(props) => {
                 return (<MyAccount {...props} web3={this.state.web3}/>)
+              }} />
+              <Route exact path="/contract/:contractID" render={(props) => {
+                return (<ViewContractPage {...props} web3={this.state.web3}/>)
               }} />
               <Route render={(props) => {
                 return (<NotFoundPage {...props} />)
