@@ -19,7 +19,7 @@ contract('LinkTRS', accounts => {
   beforeEach(async () => {
     link = await LinkToken.new()
     aggregator = await DemoAggregator.new()
-    linkTRS = await LinkTRS.new(link.address, aggregator.address, { from: acc1 })
+    linkTRS = await LinkTRS.new(link.address, aggregator.address, link.address,{ from: acc1 })
   })
 
   describe('#createContract', () => {

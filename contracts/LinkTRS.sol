@@ -2,7 +2,8 @@ pragma solidity 0.4.24;
 
 import "chainlink/contracts/interfaces/AggregatorInterface.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
-import "openzeppelin-solidity/contracts/Math/SafeMath.sol";
+// import "openzeppelin-solidity/contracts/Math/SafeMath.sol";
+import "chainlink/contracts/ChainlinkClient.sol";
 
 /**
  * @dev Interface of the ERC20 standard as defined in the EIP. Does not include
@@ -19,7 +20,7 @@ interface IERC20 {
     event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
-contract LinkTRS is Ownable {
+contract LinkTRS is Ownable, ChainlinkClient {
     
     //Struct for a user account
     struct account {
@@ -71,10 +72,48 @@ contract LinkTRS is Ownable {
     uint256 public contractCounter;
     IERC20 token;
 
-    constructor(address tokenAddress, address _aggregator) public {
+    constructor(address tokenAddress, address _aggregator, address _link) public {
         reference = AggregatorInterface(_aggregator);
         token = IERC20(tokenAddress);
+        // Set the address for the LINK token for the network.
+        if(_link == address(0)) {
+            // Useful for deploying to public networks.
+            setPublicChainlinkToken();
+        } else {
+            // Useful if you're deploying to a local network.
+            setChainlinkToken(_link);
+        }
     }
+
+    //** Functions for Chainlink Requests */
+    // Creates a Chainlink request with the uint256 multiplier job and returns the requestId
+    // function requestEthereumPrice(bytes32 _jobId, string _currency) public returns (bytes32 requestId) {
+    //     // newRequest takes a JobID, a callback address, and callback function as input
+    //     Chainlink.Request memory req = buildChainlinkRequest(_jobId, this, this.fulfillEthereumPrice.selector);
+    //     // Adds a URL with the key "get" to the request parameters
+    //     req.add("get", "https://min-api.cryptocompare.com/data/price?fsym=LINK&tsyms=DAI");
+    //     // Uses input param (dot-delimited string) as the "path" in the request parameters
+    //     req.add("path", _currency);
+    //     // Adds an integer with the key "times" to the request parameters
+    //     req.addInt("times", 100000000);
+    //     // Sends the request with 1 LINK to the oracle contract
+    //     requestId = sendChainlinkRequest(req, 1 * LINK);
+    // }
+
+    // // Creates a Chainlink request with the uint256 multiplier job and returns the requestId
+    // function requestEthereumPriceFuture(bytes32 _jobId, string _currency, uint256 requestTime) public returns (bytes32 requestId) {
+    //     // newRequest takes a JobID, a callback address, and callback function as input
+    //     Chainlink.Request memory req = buildChainlinkRequest(_jobId, this, this.fulfillEthereumPrice.selector);
+    //     // Adds a URL with the key "get" to the request parameters
+    //     req.add("get", "https://min-api.cryptocompare.com/data/price?fsym=LINK&tsyms=DAI");
+    //     // Uses input param (dot-delimited string) as the "path" in the request parameters
+    //     req.add("path", _currency);
+    //     // Adds an integer with the key "times" to the request parameters
+    //     req.addInt("times", 100000000);
+    //     req.add("runat", requestTime);
+    //     // Sends the request with 1 LINK to the oracle contract
+    //     requestId = sendChainlinkRequest(req, 1 * LINK);
+    // }
 
     /**
     * Gets the latest price from the reference data contract
@@ -155,16 +194,17 @@ contract LinkTRS is Ownable {
     }
 
     function getContractByIndex(uint index) public view returns (address, address, uint256, uint256, uint256, 
-    uint16, uint256, uint256, uint256) {
+    uint16, uint256, uint256, uint256, uint256) {
         return getContractInfo(keccak256(index));
     }
 
     function getContractInfo(bytes32 _contractID) public view returns (address, address, uint256, uint256, uint256, 
-    uint16, uint256, uint256, uint256) {
+    uint16, uint256, uint256, uint256, uint256) {
         require(validContracts[_contractID], "Please use a valid contract ID");
         trsContract memory _contract = contracts[_contractID];
         return (_contract.takerAddress, _contract.makerAddress, _contract.originalPrice, _contract.startDate,
-             _contract.expiryDate, _contract.interest, _contract.originalValue, _contract.takersMargin, _contract.makersMargin);
+             _contract.expiryDate, _contract.interest, _contract.originalValue, _contract.takersMargin, _contract.makersMargin,
+             _contract.offerExpiryDate);
     }
 
     function getContractNPV(bytes32 _contractID, uint i) public view returns (uint256, uint256, uint256, uint256, uint256) {

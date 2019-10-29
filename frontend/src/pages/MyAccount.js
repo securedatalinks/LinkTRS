@@ -5,12 +5,15 @@ import token from "../contracts/LinkToken";
 import linkTRS from "../contracts/LinkTRS";
 import contract_config from "../contract_config.json";
 import { Button, Typography } from "@material-ui/core";
+import MyAccountDisplay from "../components/MyAccountDisplay";
 
 class MyAccount extends Component {
 
     state = {
         data: [],
-        accountBalance: 0
+        accountBalance: 0,
+        account: null,
+        daiInContracts: 0,
     }
 
     componentDidMount() {
@@ -38,14 +41,14 @@ class MyAccount extends Component {
         var tokenContract = new web3.eth.Contract(token.abi, contract_config.link_dev);
         var trsContract = new web3.eth.Contract(linkTRS.abi, contract_config.linkTRS_dev);
         var account = (await this.props.web3.eth.getAccounts())[0]
-
+        this.setState({account: account})
         var userDetails = trsContract.methods.getUserDetails(account).call(async (err, result) => {
             if (err) {
                 console.log(err)
             }
 
             console.log(result[0])
-
+            this.setState({daiInContracts: result[1]})
             var contractAddresses = []
             var contractsData = []
             for (var i = 0; i < result[0]; i++) {
@@ -94,13 +97,13 @@ class MyAccount extends Component {
         })
     }   
 
-    topUpTokens = async () => {
+    topUpTokens = async (amountToTopup) => {
         var web3 = this.props.web3;
         var contract = new web3.eth.Contract(token.abi, contract_config.link_dev);
         var account = (await this.props.web3.eth.getAccounts())[0]
 
         // call create contract function
-        contract.methods.approve(contract_config.linkTRS_dev, this.props.web3.utils.toWei("30")).send({ from: account })
+        contract.methods.approve(contract_config.linkTRS_dev, this.props.web3.utils.toWei(amountToTopup)).send({ from: account })
             .on('transactionHash', (hash) => {
                 //Set Status as pending and wait for this transaction to be processed
                 console.log(hash);
@@ -128,15 +131,13 @@ class MyAccount extends Component {
         })
     }
 
-
     render() {
         return (
-            <div style={{ marginBottom: 0, paddingBottom: '30px' }}>
+            <div style={{marginBottom: 0, paddingBottom: 0, height:'80vh'}}>
                 <AppBar />
-                <Typography> Account Balance: {this.state.accountBalance} DAI </Typography>
-                <Button variant="contained" color="primary" onClick={this.topUpTokens} style={{ margin: "5px" }}>
-                    Top Up Account
-                </Button>
+                <MyAccountDisplay account={this.state.account} openContracts={this.state.data.length} 
+                    deposited={this.props.web3.utils.fromWei(this.state.daiInContracts.toString())} daiBalance={this.state.accountBalance}
+                topUpTokens={this.topUpTokens} />
                 <AccountTable data={this.state.data} web3={this.props.web3} />
             </div>
         )
