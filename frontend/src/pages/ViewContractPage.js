@@ -4,7 +4,7 @@ import token from "../contracts/LinkToken";
 import linkTRS from "../contracts/LinkTRS";
 import contract_config from "../contract_config.json";
 import RemarginLogTable from "../components/RemarginLogTable";
-import { Typography } from "@material-ui/core";
+import { Typography, Button } from "@material-ui/core";
 
 class ViewContractPage extends Component {
 
@@ -14,6 +14,16 @@ class ViewContractPage extends Component {
 
     componentDidMount() {
         this.getNPVLogs();
+    }
+    requestRemargin = async() => {
+        var web3 = this.props.web3;
+        var tokenContract = new web3.eth.Contract(token.abi, contract_config.link_dev);
+        var trsContract = new web3.eth.Contract(linkTRS.abi, contract_config.linkTRS_dev);
+        var account = (await this.props.web3.eth.getAccounts())[0]
+        console.log(account)
+        var contractID = this.props.match.params.contractID
+        console.log(contractID)
+        var remargin = await trsContract.methods.requestRemargin(contractID).send({from: account})
     }
 
     getNPVLogs = async () => {
@@ -57,6 +67,9 @@ class ViewContractPage extends Component {
             <div style={{marginBottom: 0, paddingBottom: 0, height:'80vh'}}>
                 <AppBar />
                 <Typography> Contract {this.props.match.params.contractID} </Typography>
+                <Button variant="contained" color="primary" onClick={() => {this.requestRemargin()}} style={{ margin: "5px" }}>
+                                Remargin
+                </Button>
                 <RemarginLogTable data={this.state.data} web3={this.props.web3} />
             </div>
         )
