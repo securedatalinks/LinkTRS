@@ -5,6 +5,8 @@ import LinearProgress from '@material-ui/core/LinearProgress';
 import AppBar from "../../components/AppBar";
 import InputAdornment from '@material-ui/core/InputAdornment';
 import { validateForm } from './validator';
+import linkTRS from "../../contracts/LinkTRS";
+import contract_config from "../../contract_config.json";
 
 const progressPerStep = 33.333; //Define how much as a % each step changes the users progess
 
@@ -16,8 +18,9 @@ class CreateContractForm extends Component {
         accMargin: "",
         term: "",
         minMargin: "",
-        notionalVal: "",
+        totalLink: "",
         assetVal: "",
+        interestPercent: "",
         step: 1,
         totalSteps: 4,
         progress: 33.333,
@@ -33,6 +36,11 @@ class CreateContractForm extends Component {
     onwireframeChange = (event) => {
         this.setState({ wireframe: event.target.value })
     }
+
+    onInterestChange = (event) => {
+        this.setState({ interestPercent: event.target.value })
+    }
+
     onAccMarginChange = (event) => {
         this.setState({ accMargin: event.target.value })
     }
@@ -45,9 +53,9 @@ class CreateContractForm extends Component {
         this.setState({ minMargin: event.target.value })
     }
 
-    onNotionalValChange = (event) => {
+    onLinkChange = (event) => {
         //get eth conversion
-        this.setState({ notionalVal: event.target.value })
+        this.setState({ totalLink: event.target.value })
     }
 
     onAssetlValChange = (event) => {
@@ -57,13 +65,13 @@ class CreateContractForm extends Component {
 
 
     pageForward = () => {
-        const { wireframe, accMargin, term, minMargin, notionalVal, assetVal } = this.state
+        const { wireframe, accMargin, term, minMargin, notionalVal, assetVal, interestPercent, totalLink } = this.state
         const { errors } = this.state
 
         var currentStep = this.state.step
         var currentProgress = this.state.progress
         let err = validateForm('all', {
-            wireframe, accMargin, term, minMargin, notionalVal, assetVal
+            wireframe, accMargin, term, minMargin, notionalVal, assetVal, interestPercent, totalLink
         })
 
         this.setState({
@@ -87,38 +95,60 @@ class CreateContractForm extends Component {
         this.setState({ step: currentStep - 1, progress: currentProgress - progressPerStep })
     }
 
-    completeForm = () => {
+    completeForm = async () => {
         //Construct the data from current state
-        var data = {
-            "wireframe" : this.state.wireframe,
-            "accMargin" : this.state.accMargin,
-            "term": this.state.term,
-            "minMargin": this.state.minMargin,
-            "notionalVal": this.state.notionalVal,
-            "assetVal": this.state.assetVal,
-        }
+        // var data = {
+        //     "wireframe" : this.state.wireframe,
+        //     "accMargin" : this.state.accMargin,
+        //     "term": this.state.term,
+        //     "minMargin": this.state.minMargin,
+        //     "notionalVal": this.state.notionalVal,
+        //     "assetVal": this.state.assetVal,
+        // }
         /*registerOracle(data, this.props.token, () => {
             alert("Oracle Sucessfully Registered")
             this.props.history.push("/")
         }, (error) => {
             alert("Failure: " + error)
         })*/
+
+        var web3 = this.props.web3;
+        var contract = new web3.eth.Contract(linkTRS.abi, contract_config.linkTRS_dev);
+        var account = (await this.props.web3.eth.getAccounts())[0]
+        
+        //Get all fields in correct format
+        var multipliedInterest = this.state.interestPercent * 1000
+        var multipliedMinMargin = this.state.minMargin * 1000
+        alert(multipliedInterest)
+        alert(multipliedMinMargin)
+        // call create contract function
+        contract.methods.createContract(this.state.term, multipliedInterest, multipliedMinMargin, this.state.totalLink).send({ from: account })
+            .on('transactionHash', (hash) => {
+                //Set Status as pending and wait for this transaction to be processed
+                console.log(hash);
+                web3.eth.getTransaction(hash, (err, result) => {
+                    if (err) {
+                        console.log(err)
+                    }
+                    console.log(result)
+                })
+            });
     }
 
     getButtons = () => {
         if (this.state.step === 1) {
             return (
-                <Button type="submit" variant="contained" color="primary" onClick={this.pageForward} style={{ margin: "5px" }}>
+                <Button variant="contained" color="primary" onClick={this.pageForward} style={{ margin: "5px" }}>
                     Next
                 </Button>
             )
         } else {
             return (
                 <div>
-                    <Button type="submit" variant="contained" color="primary" onClick={this.pageBackward} style={{ margin: "5px" }}>
+                    <Button variant="contained" color="primary" onClick={this.pageBackward} style={{ margin: "5px" }}>
                         Back
                     </Button>
-                    <Button type="submit" variant="contained" color="primary" onClick={this.completeForm} style={{ margin: "5px" }}>
+                    <Button variant="contained" color="primary" onClick={this.completeForm} style={{ margin: "5px" }}>
                         Submit
                     </Button>
                 </div>
@@ -134,21 +164,21 @@ class CreateContractForm extends Component {
             return (
                 <div>
                     <Typography variant="h4"> Contract Details </Typography>
-                    <TextField
+                    {/* <TextField
                         variant="outlined"
                         margin="normal"
                         required
                         fullWidth
                         id="wireframe"
-                        label="Wire Frame"
+                        label="Wire Frame (minutes for acceptance validity)"
                         name="wireframe"
                         error={errorsObj && errorsObj['wireframe'] ? true : false}
                         autoFocus
                         onChange={this.onwireframeChange}
                         value={this.state.wireframe}
                         style={this.textFieldStyle}
-                    />
-                    <TextField
+                    /> */}
+                    {/* <TextField
                         variant="outlined"
                         margin="normal"
                         type="number"
@@ -166,14 +196,14 @@ class CreateContractForm extends Component {
                         onChange={this.onAccMarginChange}
                         value={this.state.accMargin}
                         style={this.textFieldStyle}
-                    />
+                    /> */}
                     <TextField
                         variant="outlined"
                         margin="normal"
                         required
                         fullWidth
                         id="term"
-                        label="Term of Agreement"
+                        label="Term of Agreement (Days)"
                         name="term"
                         error={errorsObj && errorsObj['term'] ? true : false}
                         autoFocus
@@ -200,21 +230,40 @@ class CreateContractForm extends Component {
                         value={this.state.minMargin}
                         style={this.textFieldStyle}
                     />
+                                        <TextField
+                        variant="outlined"
+                        margin="normal"
+                        InputLabelProps={{
+                          shrink: true,
+                        }}
+                        type="number"
+                        required
+                        fullWidth
+                        id="interestPercent"
+                        label="Interest Percentage"
+                        name="interestPercent"
+                        placeholder="%"
+                        error={errorsObj && errorsObj['interestPercent'] ? true : false}
+                        autoFocus
+                        onChange={this.onInterestChange}
+                        value={this.state.interestPercent}
+                        style={this.textFieldStyle}
+                    />
                     <TextField
                         variant="outlined"
                         margin="normal"
                         required
                         fullWidth
-                        id="notionalVal"
-                        label="Notional Value"
-                        name="notionalVal"
-                        error={errorsObj && errorsObj['notionalVal'] ? true : false}
+                        id="totalLink"
+                        label="LINK covered by contract"
+                        name="totalLink"
+                        error={errorsObj && errorsObj['totalLink'] ? true : false}
                         autoFocus
-                        onChange={this.onNotionalValChange}
-                        value={this.state.notionalVal}
+                        onChange={this.onLinkChange}
+                        value={this.state.totalLink}
                         style={this.textFieldStyle}
                     />
-                    <TextField
+                    {/* <TextField
                         variant="outlined"
                         margin="normal"
                         required
@@ -230,7 +279,7 @@ class CreateContractForm extends Component {
                         onChange={this.onAssetlValChange}
                         value={this.state.assetVal}
                         style={this.textFieldStyle}
-                    />
+                    /> */}
                 </div>
             )
         } else {
@@ -238,11 +287,12 @@ class CreateContractForm extends Component {
                 <div style={{textAlign: "left"}}>
                     <Typography variant="h6"> Review </Typography>
                     <Typography variant="h5"> Contract Details </Typography>
-                    <Typography variant="subtitle1"> Wire Frame: {this.state.wireframe} </Typography>
-                    <Typography variant="subtitle1"> Acceptance Margin: {this.state.accMargin} </Typography>
-                    <Typography variant="subtitle1"> Term of Contract: {this.state.term} </Typography>
-                    <Typography variant="subtitle1"> Notional Value: {this.state.notionalVal} </Typography>
-                    <Typography variant="subtitle1"> Total Asset Value: {this.state.assetVal} </Typography>
+                    {/* <Typography variant="subtitle1"> Wire Frame: {this.state.wireframe} </Typography> */}
+                    {/* <Typography variant="subtitle1"> Acceptance Margin: {this.state.accMargin} </Typography> */}
+                    <Typography variant="subtitle1"> Term of Contract: {this.state.term} Days </Typography>
+                    <Typography variant="subtitle1"> Required Margin: {this.state.minMargin} % </Typography>
+                    <Typography variant="subtitle1"> Interest: {this.state.interestPercent} % </Typography>
+                    <Typography variant="subtitle1"> Total LINK: {this.state.totalLink} LINK </Typography>
                 </div>
             )
         }

@@ -10,7 +10,9 @@ function validateForm(check, data) {
       term,
       minMargin,
       notionalVal,
-      assetVal
+      assetVal,
+      interestPercent,
+      totalLink
     } = data;
 
     var errors = {
@@ -22,25 +24,25 @@ function validateForm(check, data) {
     //console.log(validator.isEmail(email))
 
     let Validation = {
-        wireframe: {
-            Validate: [{
-                condition: !wireframe.length,
-                message: " Please Specify The Wire Frame",
-            }, {
-                condition: /\d/.test(wireframe) || /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(wireframe),
-                message: " First Name Can Not Contain Numbers Or Any Special Characters . ",
-            }
-            ],
-            elem: "wireframe"
-        },
+        // wireframe: {
+        //     Validate: [{
+        //         condition: !wireframe.length,
+        //         message: " Please Specify The Wire Frame",
+        //     }, {
+        //         condition: /\d/.test(wireframe) || /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(wireframe),
+        //         message: " First Name Can Not Contain Numbers Or Any Special Characters . ",
+        //     }
+        //     ],
+        //     elem: "wireframe"
+        // },
 
-        accMargin: {
-            Validate: [{
-                condition: !accMargin.length,
-                message: " Please enter a valid acceptance margin",
-            }],
-            elem: "accMargin"
-        },
+        // accMargin: {
+        //     Validate: [{
+        //         condition: !accMargin.length,
+        //         message: " Please enter a valid acceptance margin",
+        //     }],
+        //     elem: "accMargin"
+        // },
 
 
         term: {
@@ -59,21 +61,23 @@ function validateForm(check, data) {
             elem: "minMargin"
         },
 
-        notionalVal: {
+        interestPercent: {
             Validate: [{
-                condition: !notionalVal.length,
+                condition: !interestPercent.length,
                 message: " Field cannot be empty ",
             }],
-            elem: "notionalVal"
+            elem: "interestPercent"
         },
 
-        assetVal: {
+
+        totalLink: {
             Validate: [{
-                condition: !assetVal.length,
+                condition: !totalLink.length,
                 message: " Field cannot be empty ",
             }],
-            elem: "assetVal"
+            elem: "totalLink"
         },
+
     }
 
     if (check === "all") {

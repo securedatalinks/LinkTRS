@@ -21,7 +21,7 @@ class App extends Component {
     try {
       // Get network provider and web3 instance.
       const web3 = await getWeb3();
-      this.setState({ loading :false })
+      this.setState({ loading :false, web3: web3 })
     } catch (error) {
       // Catch any errors for any of the above operations.
       // alert(
@@ -58,10 +58,10 @@ class App extends Component {
                 return (<MainPage {...props}/>)
               }} />
               <Route exact path="/create" render={(props) => {
-                return (<CreateContractPage {...props} />)
+                return (<CreateContractPage {...props} web3={this.state.web3}/>)
               }} />
               <Route exact path="/myaccount" render={(props) => {
-                return (<MyAccount {...props} />)
+                return (<MyAccount {...props} web3={this.state.web3}/>)
               }} />
               <Route render={(props) => {
                 return (<NotFoundPage {...props} />)
