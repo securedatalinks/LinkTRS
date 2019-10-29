@@ -9,15 +9,31 @@ import { Button, Typography } from "@material-ui/core";
 class MyAccount extends Component {
 
     state = {
-        data: null,
+        data: [],
         accountBalance: 0
     }
 
     componentDidMount() {
         this.getAllowedTokens();
+        this.getContracts();
     }
 
-    getContracts = async() => {
+    getPosition = (address, data) => {
+        if (data[0] == address) {
+            return "Taker"
+        } else {
+            return "Maker"
+        }
+    }
+
+    getCounterparty = (address, data) => {
+        if (data[0] == address) {
+            return data[1]
+        } else {
+            return data[0]
+        }
+    }
+    getContracts = async () => {
         var web3 = this.props.web3;
         var tokenContract = new web3.eth.Contract(token.abi, contract_config.link_dev);
         var trsContract = new web3.eth.Contract(linkTRS.abi, contract_config.linkTRS_dev);
@@ -28,22 +44,57 @@ class MyAccount extends Component {
                 console.log(err)
             }
 
-            var contracts = []
-            for (var i = 0; i < result; i++) {
+            console.log(result[0])
 
-                var contract = await trsContract.methods.getUserContract(i).call((err, result) => {
-                    contracts.append(result)
+            var contractAddresses = []
+            var contractsData = []
+            for (var i = 0; i < result[0]; i++) {
+
+                var contractAddress = await trsContract.methods.getUserContract(i).call(async (err, _contract) => {
+                    console.log(_contract)
+                    // return await trsContract.methods.getContractInfo(_contract).call((err, contractData) => {
+                    //     console.log(contractData)
+                    //     var thisData = {
+                    //         position: this.getPosition(account, contractData),
+                    //         takerAddress: contractData[0],
+                    //         makerAddress: contractData[1],
+                    //         startDate: contractData[3],
+                    //         expiryDate: contractData[4],
+                    //         interestRate: contractData[5],
+                    //         mm: contractData[7],
+                    //         tm: contractData[8]
+                    //     }
+                    //     //contracts.push(thisData)
+                    //     return thisData
+                    // })
                 })
+
+                contractAddresses.push(contractAddress)
             }
 
-            console.log(contracts)
-            console.log(contracts.length);
+            for (var i = 0; i < contractAddresses.length; i++) {
+                var contractData = await trsContract.methods.getContractInfo(contractAddresses[i]).call((err, contractData) => {
+                    console.log(contractData)
+                })
+                var thisData = {
+                    position: this.getPosition(account, contractData),
+                    counterpartyAddress: this.getCounterparty(account, contractData),
+                    startDate: contractData[3],
+                    expiryDate: contractData[4],
+                    interestRate: contractData[5],
+                    mm: contractData[7],
+                    tm: contractData[8]
+                }
 
+                contractsData.push(thisData)
+            }
+            console.log(contractsData)
+            this.setState({ data: contractsData })
+            
         })
+    }   
 
-    }
-
-    topUpTokens = async() => {
+    topUpTokens = async () => {
         var web3 = this.props.web3;
         var contract = new web3.eth.Contract(token.abi, contract_config.link_dev);
         var account = (await this.props.web3.eth.getAccounts())[0]
@@ -62,30 +113,31 @@ class MyAccount extends Component {
             });
     }
 
-    getAllowedTokens = async() => {
+    getAllowedTokens = async () => {
         var web3 = this.props.web3;
         var contract = new web3.eth.Contract(token.abi, contract_config.link_dev);
         var account = (await this.props.web3.eth.getAccounts())[0]
 
         // call create contract function
         contract.methods.allowance(account, contract_config.linkTRS_dev).call((err, result) => {
-            if(err) {
+            if (err) {
                 console.log(err)
             }
             console.log(result)
-            this.setState({accountBalance: this.props.web3.utils.fromWei(result)})
+            this.setState({ accountBalance: this.props.web3.utils.fromWei(result) })
         })
     }
 
 
     render() {
         return (
-            <div style={{marginBottom: 0, paddingBottom: '30px'}}>
-                <AppBar/>
+            <div style={{ marginBottom: 0, paddingBottom: '30px' }}>
+                <AppBar />
                 <Typography> Account Balance: {this.state.accountBalance} DAI </Typography>
                 <Button variant="contained" color="primary" onClick={this.topUpTokens} style={{ margin: "5px" }}>
                     Top Up Account
                 </Button>
+                <AccountTable data={this.state.data} web3={this.props.web3} />
             </div>
         )
     }

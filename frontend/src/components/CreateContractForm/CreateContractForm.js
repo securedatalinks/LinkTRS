@@ -121,8 +121,8 @@ class CreateContractForm extends Component {
         var multipliedMinMargin = this.state.minMargin * 1000
         alert(multipliedInterest)
         alert(multipliedMinMargin)
-        // call create contract function
-        contract.methods.createContract(this.state.term, multipliedInterest, multipliedMinMargin, this.state.totalLink).send({ from: account })
+        // call create contract function //todo add in ability to set contract expiry time
+        contract.methods.createContract(10, this.state.term, multipliedInterest, multipliedMinMargin, this.state.totalLink).send({ from: account })
             .on('transactionHash', (hash) => {
                 //Set Status as pending and wait for this transaction to be processed
                 console.log(hash);
