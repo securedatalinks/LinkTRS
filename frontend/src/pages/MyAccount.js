@@ -106,7 +106,11 @@ class MyAccount extends Component {
                 console.log(err)
             }
             console.log(result)
+<<<<<<< HEAD
             this.setState({ accountBalance: this.props.web3.utils.fromWei(result.toString()) })
+=======
+            this.setState({ accountBalance: this.props.web3.utils.fromWei(result.toString())})
+>>>>>>> b2c58a514767b41ec76d278573a2a28a8f924a68
         })
     }
 
@@ -114,7 +118,7 @@ class MyAccount extends Component {
         return (
             <div style={{marginBottom: 0, paddingBottom: 0, height:'80vh'}}>
                 <AppBar />
-                <MyAccountDisplay account={this.state.account} openContracts={this.state.data.length} 
+                <MyAccountDisplay account={this.state.account} openContracts={this.state.data.length}
                     deposited={this.props.web3.utils.fromWei(this.state.daiInContracts.toString())} daiBalance={this.state.accountBalance}
                 topUpTokens={this.topUpTokens} />
                 <AccountTable {...this.props} data={this.state.data} web3={this.props.web3} />
