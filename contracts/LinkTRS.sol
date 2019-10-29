@@ -56,6 +56,7 @@ contract LinkTRS is Ownable {
 
     event ContractCreated(bytes32 contractID);
     event Liquidate(bytes32 _contractID);
+    event Deposit(bytes32 _contractID, uint amount);
     event npvUpdated(bytes32 contractID);
     event priceChangeEvent(int priceChange);
     event AttemptTransfer(address from, address to, uint value);
@@ -95,7 +96,7 @@ contract LinkTRS is Ownable {
         users[from].deposited += amount;
     }
 
-    function createContract(uint256 length, uint16 interest, uint16 requiredMargin, uint256 amountOfLink) public returns (bytes32) {
+    function createContract(uint256 length, uint16 interest, uint16 requiredMargin, uint256 amountOfLink) public returns (bytes32) {        
         //Pull required info
         uint256 price = getLatestPrice(); //price (x 10^9)
         //uint256 scaledPrice = SafeMath.div(price, 1000000); //this converts it to price ($ x 1000) eg $1.24 = 1240
@@ -127,8 +128,22 @@ contract LinkTRS is Ownable {
         users[msg.sender].contracts.push(contractID);
         users[msg.sender].numContracts++;
 
+        //Deposit into makers margin account. Mul by 10000000000 to convert to tokens amount (10^18)
+        uint tokensToDeposit = SafeMath.mul(SafeMath.div(SafeMath.mul(SafeMath.mul(amountOfLink, price), requiredMargin), 100000), 10000000000);
+        deposit(tokensToDeposit, contractID);
+
         emit ContractCreated(contractID);
         return contractID;
+    }
+
+    function joinContract(bytes32 _contractID, uint256 tokensToDeposit) public returns(bool) {
+        require(validContracts[_contractID], "Please use a valid contract ID");
+        //Require the user to transfer the required margin
+        require(token.allowance(msg.sender, address(this)) >= tokensToDeposit, "You have not provided access to enough tokens");
+        //Deposit into makers margin account. Mul by 10000000000 to convert to tokens amount (10^18)
+        contracts[_contractID].takerAddress = msg.sender;
+        deposit(tokensToDeposit, _contractID);
+        return true;
     }
 
     function getUserContract(uint i) public view returns(bytes32) {
@@ -241,6 +256,7 @@ contract LinkTRS is Ownable {
             contracts[_contractID].makersMargin = SafeMath.add(contracts[_contractID].makersMargin, value);
         }
         users[msg.sender].deposited = SafeMath.add(users[msg.sender].deposited, value);
+        emit Deposit(_contractID, value);
         return true;
     }
 
@@ -249,11 +265,19 @@ contract LinkTRS is Ownable {
         trsContract memory _contract = contracts[_contractID];
         if (msg.sender == _contract.takerAddress) {
             require(contracts[_contractID].takersMargin >= value, "You can only withdraw an amount you have deposited");
+            //TODO two party vote to withdraw
+            require(token.transfer(msg.sender, value), "Token transfer must succeed");
+            //Decrement amount
+            users[msg.sender].deposited = SafeMath.sub(users[msg.sender].deposited, value);
+            contracts[_contractID].takersMargin = SafeMath.sub(contracts[_contractID].takersMargin, value);
         } else {
             require(contracts[_contractID].makersMargin >= value, "You can only withdraw an amount you have deposited");
+            //TODO two party vote to withdraw
+            require(token.transfer(msg.sender, value), "Token transfer must succeed");
+            //Decrement amount
+            users[msg.sender].deposited = SafeMath.sub(users[msg.sender].deposited, value);
+            contracts[_contractID].makersMargin = SafeMath.sub(contracts[_contractID].makersMargin, value);
         }
-        //TODO two party vote to withdraw
-        require(token.transfer(msg.sender, value), "Token transfer must succeed");
     }
 
 }
