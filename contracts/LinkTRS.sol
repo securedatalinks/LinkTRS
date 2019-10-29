@@ -154,6 +154,11 @@ contract LinkTRS is Ownable {
         return users[msg.sender].contracts[i];
     }
 
+    function getContractByIndex(uint index) public view returns (address, address, uint256, uint256, uint256, 
+    uint16, uint256, uint256, uint256) {
+        return getContractInfo(keccak256(index));
+    }
+
     function getContractInfo(bytes32 _contractID) public view returns (address, address, uint256, uint256, uint256, 
     uint16, uint256, uint256, uint256) {
         require(validContracts[_contractID], "Please use a valid contract ID");
@@ -287,12 +292,6 @@ contract LinkTRS is Ownable {
     function getUserDetails(address _user) public returns(uint256, uint256) {
         account user = users[_user];
         return (user.numContracts, user.deposited);
-    }
-
-
-    //Helper functions
-    function computerHash(uint contractIndex) public pure returns (bytes32) {
-        return keccak256(contractIndex);
     }
 
 }
