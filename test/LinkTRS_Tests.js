@@ -33,6 +33,7 @@ contract('LinkTRS', accounts => {
         await link.approve(linkTRS.address, web3.utils.toWei("20"));
         //2% of $1000 is $20, therefore 20 tokens are required in the margin account
         await linkTRS.createContract(
+          10,
           5,
           5000,
           2000,
@@ -57,6 +58,7 @@ contract('LinkTRS', accounts => {
       it('fails without all params', async () => {
         try {
           await linkTRS.createContract(
+            10,
             5,
             500,
             2000,
@@ -73,6 +75,7 @@ contract('LinkTRS', accounts => {
         await link.approve(linkTRS.address, web3.utils.toWei("20"));
         //2% of $1000 is $20, therefore 20 tokens are required in the margin account
         await linkTRS.createContract(
+          10,
           5,
           5000,
           2000,
@@ -88,8 +91,8 @@ contract('LinkTRS', accounts => {
 
         //Get user 2 to join the contract
         await link.transfer(acc2, web3.utils.toWei("50"));
-        await link.approve(linkTRS.address, web3.utils.toWei("20"), {from: acc2})
-        await linkTRS.joinContract(contractID, web3.utils.toWei("20"), {from:acc2})
+        await link.approve(linkTRS.address, web3.utils.toWei("20"), { from: acc2 })
+        await linkTRS.joinContract(contractID, web3.utils.toWei("20"), { from: acc2 })
 
         //Check both margin accounts are now funded
         var contractDetails = await linkTRS.getContractInfo(contractID)
@@ -102,7 +105,41 @@ contract('LinkTRS', accounts => {
         assert.equal(contractDetails[8].toString(), web3.utils.toWei("20").toString()) //makers margin
       })
 
-      
+
+      it('cant join a contract after it has expired', async () => {
+        //Create Contract
+        //Approve the contract to be allowed to deposit the required amount
+        await link.approve(linkTRS.address, web3.utils.toWei("20"));
+        //2% of $1000 is $20, therefore 20 tokens are required in the margin account
+        await linkTRS.createContract(
+          0,
+          5,
+          5000,
+          2000,
+          1000,
+        )
+        var contractID = await linkTRS.getUserContract(0);
+        var contractDetails = await linkTRS.getContractInfo(contractID)
+        assert.equal(contractDetails[0], "0x0000000000000000000000000000000000000000")
+        assert.equal(contractDetails[1], acc1)
+        assert.equal(contractDetails[2].toString(), web3.utils.toBN("100000000").toString()) //price in price * 10^8
+        assert.equal(contractDetails[5].toString(), web3.utils.toBN("5000").toString()) //interest in % * 1000 (i.e 5% = 5000)
+        assert.equal(contractDetails[6].toString(), web3.utils.toBN("100000000000").toString())
+
+        //Get user 2 to join the contract
+        try {
+          await link.transfer(acc2, web3.utils.toWei("50"));
+          await link.approve(linkTRS.address, web3.utils.toWei("20"), { from: acc2 })
+          await linkTRS.joinContract(contractID, web3.utils.toWei("20"), { from: acc2 })
+
+          assert.equal(true, false)
+        } catch (e) {
+          //Should fail
+          assert.equal(true, true)
+        }
+      })
+
+
 
     })
 
@@ -115,6 +152,7 @@ contract('LinkTRS', accounts => {
 
         //Create contract
         await linkTRS.createContract(
+          10,
           5,
           6500, //6.5%
           2000,
@@ -137,6 +175,7 @@ contract('LinkTRS', accounts => {
 
         //Create contract
         await linkTRS.createContract(
+          10,
           5,
           5000,
           2000,
@@ -179,6 +218,7 @@ contract('LinkTRS', accounts => {
         //2% of $1000 is $20, therefore 20 tokens are required in the margin account
 
         await linkTRS.createContract(
+          10,
           5,
           5000,
           2000,
@@ -206,6 +246,7 @@ contract('LinkTRS', accounts => {
         //2% of $1000 is $20, therefore 20 tokens are required in the margin account
 
         await linkTRS.createContract(
+          10,
           5,
           5000,
           2000,
@@ -239,7 +280,7 @@ contract('LinkTRS', accounts => {
         assert.equal((linkBalanceAfter.sub(linkBalanceBefore)).toString(), web3.utils.toWei("3").toString())
       })
 
-     })
-   })
+    })
+  })
 
 })

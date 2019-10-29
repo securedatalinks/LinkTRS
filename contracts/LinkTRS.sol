@@ -51,6 +51,7 @@ contract LinkTRS is Ownable {
         uint256 takersMargin;
         uint256 makersMargin;
         uint32 numNPV;
+        uint256 offerExpiryDate;
         npvCalcs[] npvs;
     }
 
@@ -96,12 +97,13 @@ contract LinkTRS is Ownable {
         users[from].deposited += amount;
     }
 
-    function createContract(uint256 length, uint16 interest, uint16 requiredMargin, uint256 amountOfLink) public returns (bytes32) {        
+    function createContract(uint256 timeToLive, uint256 length, uint16 interest, uint16 requiredMargin, uint256 amountOfLink) public returns (bytes32) {        
         //Pull required info
         uint256 price = getLatestPrice(); //price (x 10^9)
         //uint256 scaledPrice = SafeMath.div(price, 1000000); //this converts it to price ($ x 1000) eg $1.24 = 1240
         bytes32 contractID = keccak256(contractCounter);
         uint256 expiryDate = now + length * 1 days;
+        uint256 offerExpiryDate = now + timeToLive * 1 minutes;
         //uint256 value = SafeMath.mul(amountOfLink, scaledPrice);
         uint256 value = SafeMath.mul(amountOfLink, price);
         //Create initial npv entry
@@ -120,6 +122,7 @@ contract LinkTRS is Ownable {
         contracts[contractID].makersMargin = 0;
         contracts[contractID].originalValue = value;
         contracts[contractID].numNPV = 1;
+        contracts[contractID].offerExpiryDate = offerExpiryDate;
         contracts[contractID].npvs.push(npvEntry);
         validContracts[contractID] = true;
         contractCounter++;
@@ -138,6 +141,7 @@ contract LinkTRS is Ownable {
 
     function joinContract(bytes32 _contractID, uint256 tokensToDeposit) public returns(bool) {
         require(validContracts[_contractID], "Please use a valid contract ID");
+        require(now <= contracts[_contractID].offerExpiryDate, "You can only accept a currently valid offer");
         //Require the user to transfer the required margin
         require(token.allowance(msg.sender, address(this)) >= tokensToDeposit, "You have not provided access to enough tokens");
         //Deposit into makers margin account. Mul by 10000000000 to convert to tokens amount (10^18)
@@ -278,6 +282,17 @@ contract LinkTRS is Ownable {
             users[msg.sender].deposited = SafeMath.sub(users[msg.sender].deposited, value);
             contracts[_contractID].makersMargin = SafeMath.sub(contracts[_contractID].makersMargin, value);
         }
+    }
+
+    function getUserDetails(address _user) public returns(uint256, uint256) {
+        account user = users[_user];
+        return (user.numContracts, user.deposited);
+    }
+
+
+    //Helper functions
+    function computerHash(uint contractIndex) public pure returns (bytes32) {
+        return keccak256(contractIndex);
     }
 
 }
