@@ -9,7 +9,6 @@ import Typography from '@material-ui/core/Typography';
 import { PulseLoader } from 'react-spinners';
 
 import getWeb3 from './utils/getWeb3'
-import ViewContractPage from './pages/ViewContractPage';
 
 class App extends Component {
   state = {
@@ -56,16 +55,13 @@ class App extends Component {
         <div className="App" style={{ backgroundColor: "inherit", margin: 0, padding: 0}}>
             <Switch>
               <Route exact path="/" render={(props) => {
-                return (<MainPage {...props}/>)
+                return (<MainPage {...props} web3={this.state.web3} />)
               }} />
               <Route exact path="/create" render={(props) => {
                 return (<CreateContractPage {...props} web3={this.state.web3}/>)
               }} />
               <Route exact path="/myaccount" render={(props) => {
                 return (<MyAccount {...props} web3={this.state.web3}/>)
-              }} />
-              <Route exact path="/contract/:contractID" render={(props) => {
-                return (<ViewContractPage {...props} web3={this.state.web3}/>)
               }} />
               <Route render={(props) => {
                 return (<NotFoundPage {...props} />)

@@ -94,9 +94,9 @@ class MyAccount extends Component {
             }
             console.log(contractsData)
             this.setState({ data: contractsData })
-            
+
         })
-    }   
+    }
 
     topUpTokens = async (amountToTopup) => {
         var web3 = this.props.web3;
@@ -128,7 +128,7 @@ class MyAccount extends Component {
                 console.log(err)
             }
             console.log(result)
-            this.setState({ accountBalance: this.props.web3.utils.fromWei(result) })
+            this.setState({ accountBalance: this.props.web3.utils.fromWei(result.toString())})
         })
     }
 
@@ -136,7 +136,7 @@ class MyAccount extends Component {
         return (
             <div style={{marginBottom: 0, paddingBottom: 0, height:'80vh'}}>
                 <AppBar />
-                <MyAccountDisplay account={this.state.account} openContracts={this.state.data.length} 
+                <MyAccountDisplay account={this.state.account} openContracts={this.state.data.length}
                     deposited={this.props.web3.utils.fromWei(this.state.daiInContracts.toString())} daiBalance={this.state.accountBalance}
                 topUpTokens={this.topUpTokens} />
                 <AccountTable {...this.props} data={this.state.data} web3={this.props.web3} />
