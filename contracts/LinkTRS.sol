@@ -68,7 +68,7 @@ contract LinkTRS is Ownable {
     mapping(address => account) users;
     mapping (bytes32 => trsContract) contracts;
     mapping (bytes32 => bool) validContracts;
-    uint256 contractCounter;
+    uint256 public contractCounter;
     IERC20 token;
 
     constructor(address tokenAddress, address _aggregator) public {
