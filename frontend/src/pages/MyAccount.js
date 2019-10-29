@@ -106,11 +106,7 @@ class MyAccount extends Component {
                 console.log(err)
             }
             console.log(result)
-<<<<<<< HEAD
             this.setState({ accountBalance: this.props.web3.utils.fromWei(result.toString()) })
-=======
-            this.setState({ accountBalance: this.props.web3.utils.fromWei(result.toString())})
->>>>>>> b2c58a514767b41ec76d278573a2a28a8f924a68
         })
     }
 

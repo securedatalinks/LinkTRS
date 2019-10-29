@@ -21,11 +21,11 @@ class MainPage extends Component {
 
     componentDidMount = async () => {
       //get contracts data
-      //this.getContracts();
-      var listings = [];
-      listings.push(test)
-      await this.setState({ data: listings })
-      console.log(this.state.data)
+      this.getContracts();
+      // var listings = [];
+      // listings.push(test)
+      // await this.setState({ data: listings })
+      // console.log(this.state.data)
     }
 
     getContracts= async() => {

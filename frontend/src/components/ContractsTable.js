@@ -28,60 +28,84 @@ const testListings = [{
 class ContractsTable extends Component {
   state = {
     times: [],
-    loadError: false, loading: true,
+    loadError: false, 
+    loading: true,
+    currentTime: 0
   }
 
   componentDidMount = async () => {
-      //if (this.props.data.length !== 0) {
-          this.setState({loading: false})
-          //recalculate the time to live based on the oracles timestamp
-          this.calculateTimeToLive()
-          this.myInterval = setInterval(() => {
-            var newTimes = []
-            const { times } = this.state
-            for (var i = 0; i < testListings.length; i++) {
-            //for (var i = 0; i < this.props.data.length; i++) {
-              if (times[i].seconds > 0) {
-                newTimes.push({
-                  minutes: times[i].minutes,
-                  seconds: times[i].seconds - 1
-                })
-              }
-              if (times[i].seconds === 0) {
-                if (times[i].minutes === 0) {
-                  clearInterval(this.myInterval)
-                } else {
-                  newTimes.push({
-                    minutes: times[i].minutes - 1,
-                    seconds: 59
-                  })
-                }
-              }
-            }
-            this.setState({ times: newTimes })
-
-          }, 1000)
-        //}
-}
-
-calculateTimeToLive = async () => {
-  var times = []
-  for (var i = 0; i < testListings.length; i++) {
-  //for (var i = 0; i < this.props.data.length; i++) {
-    var current = Math.round((new Date()).getTime() / 1000);
-    var ttl = testListings[i].startDate - current
-    //var ttl = this.props.data[i].startDate - current
-    var minutes = Math.floor(ttl/60)
-    var seconds = ttl - (minutes * 60)
-    var time = {
-      minutes: minutes,
-      seconds: seconds
-    }
-    times.push(time)
+    this.myInterval = setInterval(() => {
+      var currentTime = Math.round((new Date()).getTime() / 1000);
+      this.setState({currentTime: currentTime})
+    }, 1000)
+    this.setState({loading: false})
   }
 
-  await this.setState({ times: times })
-}
+  convertToProperTime = (ttl) => {
+    var minutes = Math.floor(ttl/60)
+    var seconds = ttl - (minutes * 60)
+    return minutes+" mins, " + seconds + " secs"
+
+  }
+//   componentDidMount = async () => {
+//       //if (this.props.data.length !== 0) {
+//           this.setState({loading: false})
+//           //recalculate the time to live based on the oracles timestamp
+//           //var times = await this.calculateTimeToLive()
+//           this.myInterval = setInterval(async () => {
+//             var times = await this.calculateTimeToLive()
+//             var newTimes = []
+//             //const { times } = this.state
+//             //for (var i = 0; i < testListings.length; i++) {
+//             console.log(this.props.data)
+//             for (var i = 0; i < this.props.data.length; i++) {
+//               console.log("i: " + i)
+//               if (times[i].seconds > 0) {
+//                 newTimes.push({
+//                   minutes: times[i].minutes,
+//                   seconds: times[i].seconds - 1
+//                 })
+//               }
+//               if (times[i].seconds === 0) {
+//                 if (times[i].minutes === 0) {
+//                   clearInterval(this.myInterval)
+//                 } else {
+//                   newTimes.push({
+//                     minutes: times[i].minutes - 1,
+//                     seconds: 59
+//                   })
+//                 }
+//               }
+//             }
+//             this.setState({ times: newTimes })
+
+//           }, 1000)
+//         //}
+// }
+
+// calculateTimeToLive = async () => {
+//   var times = []
+//   //for (var i = 0; i < testListings.length; i++) {
+//   for (var i = 0; i < this.props.data.length; i++) {
+//     console.log("hey: " + i);
+//     var current = Math.round((new Date()).getTime() / 1000);
+//     //var ttl = testListings[i].startDate - current
+//     var ttl = this.props.data[i].startDate - current
+//     var minutes = Math.floor(ttl/60)
+//     var seconds = ttl - (minutes * 60)
+//     var time = {
+//       'minutes': minutes,
+//       'seconds': seconds
+//     }
+
+
+//     times.push(time)
+//   }
+//   console.log("TIMES")
+//   console.log(times)
+//   return times
+//   //this.setState({ times: times })
+// }
 
 calculateTerm = (startDate, expiryDate) => {
   var diff = expiryDate - startDate;
@@ -121,7 +145,7 @@ calculateTerm = (startDate, expiryDate) => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {testListings.map(row => (
+                {this.props.data.map(row => (
                   <TableRow hover={true} key={row.id}>
                       <TableCell component="th" scope="row" id={row.id}>
                           <RouterLink to={{
@@ -134,7 +158,8 @@ calculateTerm = (startDate, expiryDate) => {
                                   textDecoration: 'none',
                                   color: "#000000"
                               }}>
-                              Make Contract Offer {this.state.times[row.id].minutes}:{ this.state.times[row.id].seconds < 10 ? `0${ this.state.times[row.id].seconds }` : this.state.times[row.id].seconds }
+                              {/* Make Contract Offer {this.state.times[row.id].minutes}:{ this.state.times[row.id].seconds < 10 ? `0${ this.state.times[row.id].seconds }` : this.state.times[row.id].seconds } */}
+                              Make Contract Offer {this.convertToProperTime(this.state.currentTime - row.startDate)}
                           </RouterLink>
                         </TableCell>
                     <TableCell align="right">{Math.floor((row.expiryDate - row.startDate)/(60*60*24))}</TableCell>
