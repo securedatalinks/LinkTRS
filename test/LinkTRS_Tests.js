@@ -203,6 +203,27 @@ contract('LinkTRS', accounts => {
         // console.log(npvAfter[4].toString())
       })
 
+      // it('can sucessfully request a remargin', async () => {
+      //   //Approve the contract to be allowed to deposit the required amount
+      //   await link.approve(linkTRS.address, web3.utils.toWei("1"));
+      //   //2% of $10 is $0.2, therefore 0.2 tokens are required in the margin account
+
+      //   //Create contract
+      //   await linkTRS.createContract(
+      //     10,
+      //     5,
+      //     6500, //6.5%
+      //     2000,
+      //     10,
+      //   )
+      //   var contractID = await linkTRS.getUserContract(0);
+      //   //Update contract price
+      //   //await aggregator.increasePrice()
+
+      //   //Remargin
+      //   await linkTRS.requestRemargin(contractID)
+      // })
+
     })
   })
 

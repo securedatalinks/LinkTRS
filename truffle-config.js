@@ -1,4 +1,5 @@
 const HDWalletProvider = require('truffle-hdwallet-provider')
+var mnemonic = "lyrics various math speak almost tonight license crash whisper flush gossip knee";
 
 module.exports = {
   networks: {
@@ -6,6 +7,11 @@ module.exports = {
       host: '127.0.0.1',
       port: 8545,
       network_id: '*',
+    },
+    ropsten: {
+      provider: new HDWalletProvider(mnemonic, "https://ropsten.infura.io/v3/9964b47e23b14a3396e69c1da884ab81"),
+      network_id: 3,
+      gas: 8000000
     },
     live: {
       provider: () => {

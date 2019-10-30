@@ -21,7 +21,9 @@ interface IERC20 {
 }
 
 contract LinkTRS is Ownable, ChainlinkClient {
-    
+    address _oracle = 0xa0BfFBdf2c440D6c76af13c30d9B320F9d2DeA6A;
+    uint256 paymentAmount = 1 * LINK;
+
     //Struct for a user account
     struct account {
         address owner;
@@ -88,7 +90,7 @@ contract LinkTRS is Ownable, ChainlinkClient {
 
     //** Functions for Chainlink Requests */
     // Creates a Chainlink request with the uint256 multiplier job and returns the requestId
-    function requestEthereumPrice(bytes32 _contractID, bytes32 _jobId) public returns (bytes32 requestId) {
+    function requestEthereumPrice(bytes32 _contractID, bytes32 _jobId) public  {
         // newRequest takes a JobID, a callback address, and callback function as input
         Chainlink.Request memory req = buildChainlinkRequest(_jobId, this, this.fulfillEthereumPrice.selector);
         // Adds a URL with the key "get" to the request parameters
@@ -97,8 +99,11 @@ contract LinkTRS is Ownable, ChainlinkClient {
         req.add("path", "DAI");
         // Adds an integer with the key "times" to the request parameters
         req.addInt("times", 100000000);
-        // Sends the request with 1 LINK to the oracle contract
-        requestId = sendChainlinkRequest(req, 1 * LINK);
+        // Sends the request with the amount of payment specified to the oracle
+        bytes32 _requestId = sendChainlinkRequestTo(_oracle, req, paymentAmount);
+        // //Set the request to be associated with the contract
+        requestToContract[_requestId] = _contractID;
+        //return _requestId;
     }
 
     // // Creates a Chainlink request with the uint256 multiplier job and returns the requestId
@@ -286,7 +291,8 @@ contract LinkTRS is Ownable, ChainlinkClient {
     }
 
     function requestRemargin(bytes32 _contractID) public returns(bool) {
-        requestEthereumPrice(_contractID, "e0fc58dc839a42808c3c51186f6f8381"); //make request to the SDL node
+        bytes32 jobID = "e0fc58dc839a42808c3c51186f6f8381";
+        requestEthereumPrice(_contractID, jobID); //make request to the SDL node
     }
 
     /**
