@@ -67,7 +67,7 @@ contract LinkTRS is Ownable, ChainlinkClient {
     event TestEmit(uint interest, uint priceDiff);
     event amountToPay(uint tokens);
 
-    AggregatorInterface internal reference;
+    AggregatorInterface internal referenceContract;
     mapping(address => account) users;
     mapping (bytes32 => trsContract) contracts;
     mapping (bytes32 => bool) validContracts;
@@ -76,7 +76,7 @@ contract LinkTRS is Ownable, ChainlinkClient {
     IERC20 token;
 
     constructor(address tokenAddress, address _aggregator, address _link) public {
-        reference = AggregatorInterface(_aggregator);
+        referenceContract = AggregatorInterface(_aggregator);
         token = IERC20(tokenAddress);
         // Set the address for the LINK token for the network.
         if(_link == address(0)) {
@@ -135,14 +135,14 @@ contract LinkTRS is Ownable, ChainlinkClient {
     * Gets the latest price from the reference data contract
     */
     function getLatestPrice() public view returns (uint256) {
-        return abs(reference.currentAnswer());
+        return abs(referenceContract.currentAnswer());
     }
 
     /**
     * Gets the last updated block height from the reference data contract
     */
     function getLatestUpdateHeight() public view returns (uint256) {
-        return reference.updatedHeight();
+        return referenceContract.updatedHeight();
     }
 
     /**
@@ -156,8 +156,8 @@ contract LinkTRS is Ownable, ChainlinkClient {
         //Pull required info
         uint256 price = getLatestPrice(); //price (x 10^9)
         bytes32 contractID = keccak256(contractCounter);
-        uint256 expiryDate = now + length * 1 days;
         uint256 offerExpiryDate = now + timeToLive * 1 minutes;
+        uint256 expiryDate = offerExpiryDate + length * 1 days;
         //uint256 value = SafeMath.mul(amountOfLink, scaledPrice);
         uint256 value = SafeMath.mul(amountOfLink, price);
         //Create initial npv entry
@@ -213,6 +213,10 @@ contract LinkTRS is Ownable, ChainlinkClient {
         return getContractInfo(keccak256(index));
     }
 
+    function getContractID(uint index) public view returns (bytes32) {
+        return keccak256(index);
+    }
+
     function getContractInfo(bytes32 _contractID) public view returns (address, address, uint256, uint256, uint256, 
     uint16, uint256, uint256, uint256, uint256, uint256) {
         require(validContracts[_contractID], "Please use a valid contract ID");
@@ -220,6 +224,11 @@ contract LinkTRS is Ownable, ChainlinkClient {
         return (_contract.takerAddress, _contract.makerAddress, _contract.originalPrice, _contract.startDate,
              _contract.expiryDate, _contract.interest, _contract.originalValue, _contract.takersMargin, _contract.makersMargin,
              _contract.offerExpiryDate, _contract.numNPV);
+    }
+
+    function getContractExpiryTime(bytes32 _contractID) public view returns (uint256) {
+        require(validContracts[_contractID], "Please use a valid contract ID");
+        return contracts[_contractID].offerExpiryDate;
     }
 
     function getContractNPV(bytes32 _contractID, uint i) public view returns (uint256, uint256, uint256, uint256, uint256) {
