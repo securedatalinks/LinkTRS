@@ -27,7 +27,8 @@ contract LinkTRS is Ownable, ChainlinkClient {
     //Struct for a user account
     struct account {
         address owner;
-        bytes32[] contracts;
+        //bytes32[] contracts;
+        mapping(uint256 => bytes32) contracts;
         uint256 numContracts;
         uint256 deposited; //total cDAI deposited
     }
@@ -55,19 +56,17 @@ contract LinkTRS is Ownable, ChainlinkClient {
         uint256 makersMargin;
         uint32 numNPV;
         uint256 offerExpiryDate;
+        uint256 amountOfLink;
+        bool active;
         npvCalcs[] npvs;
     }
 
     event ContractCreated(bytes32 contractID);
-    event Liquidate(bytes32 _contractID);
+    event Liquidate(bytes32 _contractID, address partyToLiquidate);
     event Deposit(bytes32 _contractID, uint amount);
-    event npvUpdated(bytes32 contractID);
-    event priceChangeEvent(int priceChange);
-    event AttemptTransfer(address from, address to, uint value);
-    event TestEmit(uint interest, uint priceDiff);
-    event amountToPay(uint tokens);
+    event PriceFufilled(bytes32 _contractID, uint price);
 
-    AggregatorInterface internal referenceContract;
+    AggregatorInterface internal aggregatorContract;
     mapping(address => account) users;
     mapping (bytes32 => trsContract) contracts;
     mapping (bytes32 => bool) validContracts;
@@ -76,7 +75,7 @@ contract LinkTRS is Ownable, ChainlinkClient {
     IERC20 token;
 
     constructor(address tokenAddress, address _aggregator, address _link) public {
-        referenceContract = AggregatorInterface(_aggregator);
+        aggregatorContract = AggregatorInterface(_aggregator);
         token = IERC20(tokenAddress);
         // Set the address for the LINK token for the network.
         if(_link == address(0)) {
@@ -88,61 +87,18 @@ contract LinkTRS is Ownable, ChainlinkClient {
         }
     }
 
-    //** Functions for Chainlink Requests */
-    // Creates a Chainlink request with the uint256 multiplier job and returns the requestId
-    function requestEthereumPrice(bytes32 _contractID, bytes32 _jobId) public  {
-        // newRequest takes a JobID, a callback address, and callback function as input
-        Chainlink.Request memory req = buildChainlinkRequest(_jobId, this, this.fulfillEthereumPrice.selector);
-        // Adds a URL with the key "get" to the request parameters
-        req.add("get", "https://min-api.cryptocompare.com/data/price?fsym=LINK&tsyms=DAI");
-        // Uses input param (dot-delimited string) as the "path" in the request parameters
-        req.add("path", "DAI");
-        // Adds an integer with the key "times" to the request parameters
-        req.addInt("times", 100000000);
-        // Sends the request with the amount of payment specified to the oracle
-        bytes32 _requestId = sendChainlinkRequestTo(_oracle, req, paymentAmount);
-        // //Set the request to be associated with the contract
-        requestToContract[_requestId] = _contractID;
-        //return _requestId;
-    }
-
-    // // Creates a Chainlink request with the uint256 multiplier job and returns the requestId
-    // function requestEthereumPriceFuture(bytes32 _contractID, bytes32 _jobId, string _currency, uint256 requestTime) public returns (bytes32 requestId) {
-    //     // newRequest takes a JobID, a callback address, and callback function as input
-    //     Chainlink.Request memory req = buildChainlinkRequest(_jobId, this, this.fulfillEthereumPriceFuture.selector);
-    //     // Adds a URL with the key "get" to the request parameters
-    //     req.add("get", "https://min-api.cryptocompare.com/data/price?fsym=LINK&tsyms=DAI");
-    //     // Uses input param (dot-delimited string) as the "path" in the request parameters
-    //     req.add("path", _currency);
-    //     // Adds an integer with the key "times" to the request parameters
-    //     req.addInt("times", 100000000);
-    //     req.add("runat", requestTime);
-    //     // Sends the request with 1 LINK to the oracle contract
-    //     requestId = sendChainlinkRequest(req, 1 * LINK);
-    // }
-
-    function fulfillEthereumPrice(bytes32 _requestId, uint256 _price) public recordChainlinkFulfillment(_requestId) {
-            bytes32 _contractID = requestToContract[_requestId];
-            require(validContracts[_contractID], "Invalid request");
-            remargin(_contractID, _price);
-    }
-
-    // function fulfillEthereumPriceFuture(bytes32 _requestId, uint256 _price) public recordChainlinkFulfillment(_requestId) {
-    //         //price = _price;
-    // }
-
     /**
     * Gets the latest price from the reference data contract
     */
     function getLatestPrice() public view returns (uint256) {
-        return abs(referenceContract.currentAnswer());
+        return abs(aggregatorContract.currentAnswer());
     }
 
     /**
     * Gets the last updated block height from the reference data contract
     */
     function getLatestUpdateHeight() public view returns (uint256) {
-        return referenceContract.updatedHeight();
+        return aggregatorContract.updatedHeight();
     }
 
     /**
@@ -152,7 +108,9 @@ contract LinkTRS is Ownable, ChainlinkClient {
         users[from].deposited += amount;
     }
 
-    function createContract(uint256 timeToLive, uint256 length, uint16 interest, uint16 requiredMargin, uint256 amountOfLink) public returns (bytes32) {        
+    function createContract(uint256 timeToLive, uint256 length, uint16 interest, uint16 requiredMargin,
+        uint256 amountOfLink, uint256 marginToProvide) public returns (bytes32) {
+
         //Pull required info
         uint256 price = getLatestPrice(); //price (x 10^9)
         bytes32 contractID = keccak256(contractCounter);
@@ -178,16 +136,22 @@ contract LinkTRS is Ownable, ChainlinkClient {
         contracts[contractID].numNPV = 1;
         contracts[contractID].offerExpiryDate = offerExpiryDate;
         contracts[contractID].npvs.push(npvEntry);
+        contracts[contractID].amountOfLink = amountOfLink;
+        contracts[contractID].active = false;
         validContracts[contractID] = true;
         contractCounter++;
 
         //Update user info
-        users[msg.sender].contracts.push(contractID);
+        // users[msg.sender].contracts.push(contractID);
+        // users[msg.sender].numContracts++;
+        users[msg.sender].contracts[users[msg.sender].numContracts] = contractID;
         users[msg.sender].numContracts++;
 
         //Deposit into makers margin account. Mul by 10000000000 to convert to tokens amount (10^18)
         uint tokensToDeposit = SafeMath.mul(SafeMath.div(SafeMath.mul(SafeMath.mul(amountOfLink, price), requiredMargin), 100000), 10000000000);
-        deposit(tokensToDeposit, contractID);
+        //Check they are depositing more than the margin
+        require(marginToProvide >= tokensToDeposit, "You have not provided enough tokens as margin");
+        deposit(marginToProvide, contractID);
 
         emit ContractCreated(contractID);
         return contractID;
@@ -200,6 +164,7 @@ contract LinkTRS is Ownable, ChainlinkClient {
         require(token.allowance(msg.sender, address(this)) >= tokensToDeposit, "You have not provided access to enough tokens");
         //Deposit into makers margin account. Mul by 10000000000 to convert to tokens amount (10^18)
         contracts[_contractID].takerAddress = msg.sender;
+        contracts[_contractID].active = true;
         deposit(tokensToDeposit, _contractID);
         return true;
     }
@@ -222,8 +187,13 @@ contract LinkTRS is Ownable, ChainlinkClient {
         require(validContracts[_contractID], "Please use a valid contract ID");
         trsContract memory _contract = contracts[_contractID];
         return (_contract.takerAddress, _contract.makerAddress, _contract.originalPrice, _contract.startDate,
-             _contract.expiryDate, _contract.interest, _contract.originalValue, _contract.takersMargin, _contract.makersMargin,
+             _contract.expiryDate, _contract.interest, _contract.amountOfLink, _contract.takersMargin, _contract.makersMargin,
              _contract.offerExpiryDate, _contract.numNPV);
+    }
+
+    function isActive(bytes32 _contractID) public view returns (bool) {
+        require(validContracts[_contractID], "Please use a valid contract ID");
+        return(contracts[_contractID].active);
     }
 
     function getContractExpiryTime(bytes32 _contractID) public view returns (uint256) {
@@ -240,76 +210,90 @@ contract LinkTRS is Ownable, ChainlinkClient {
     * Function for calculating the NPV at a given point in time for a specific contract.
     * @dev requires the starting state for the NVP array to be intilized (when contract is created)
     */
-    function calcNPV(bytes32 _contractId, uint256 price) internal returns (bool) {
+    function calcNPV(bytes32 _contractId) internal returns (bool) {
         //Calc npv
-        //uint256 price = getLatestPrice(); //price * 10^9
-        //uint256 scaledPrice = SafeMath.div(price, 1000000); //this converts it to price ($ x 1000) eg $1.24 = 1240
+        uint256 price = getLatestPrice(); //price * 10^9
 
         trsContract memory _contract = contracts[_contractId];
-
         npvCalcs memory lastNPV = contracts[_contractId].npvs[contracts[_contractId].numNPV - 1];
-        int256 priceChange = (int256)(price - lastNPV.price);
-        emit priceChangeEvent(priceChange);
-        uint256 absPriceChange = abs(priceChange);
-        //uint256 timeChange = SafeMath.div(SafeMath.sub(now + 31536000, lastNPV.date), 86400); //for testing pretend a year has past
-        //Interest is represented as percent x 1000 (i.e 5.5% = 5500)
-        uint256 interestPercent = SafeMath.div(SafeMath.mul(SafeMath.div(36500, 365), _contract.interest), 1);
 
+        int256 priceChange = (int256)(price - lastNPV.price);
+        uint256 timeChange = SafeMath.mul(SafeMath.sub(now, lastNPV.date), 100); //for testing pretend a year has past
+        //uint timeChange = 3153600000; //seconds * 100
+        //Interest is represented as percent x 1000 (i.e 5.5% = 5500)
+        uint256 interestPercent = SafeMath.div(SafeMath.mul(SafeMath.div(timeChange, 31536000),
+            _contract.interest), 1); //31536000 = seconds in a year
         //At this point, price diff is (price diff) * 10^7 and interest is % * 10^2. Want percent as a decimal * 10^7 (i.e % in 10^)
         //eg (5.5% should be 0.05500 * 10^7 = 5500 * 10^2)
-        emit TestEmit(interestPercent, absPriceChange);
-        uint256 npv = SafeMath.mul(SafeMath.sub(absPriceChange,interestPercent),
+        //emit TestEmit(interestPercent, absPriceChange);
+        uint256 npv = SafeMath.mul(SafeMath.sub(abs(priceChange),interestPercent),
             _contract.originalValue);
         //this is to account for the fact that the price is increased this much before being written on chain
         uint256 scaledNpv = SafeMath.div(npv, 100000000); //remove excess from interest being x1000
-        
-        // //TODO incoperate margin changes here
-        npvCalcs memory thisCalc = npvCalcs(now, price, lastNPV.takersMargin, lastNPV.makersMargin, scaledNpv);
-        contracts[_contractId].npvs.push(thisCalc);
-        contracts[_contractId].numNPV++;
 
-        emit npvUpdated(_contractId);
+        //emit npvUpdated(_contractId);
 
         //TODO Calc amount of tokens to transfer
         //npv is excess to pay in $x.xx * 10^8.
         uint amountOfTokens = SafeMath.mul(SafeMath.div(SafeMath.div(SafeMath.mul(npv,1000),price), 1000), 10000000000);
         //Now to convert to tokens (which are in 10^18), we need to multiply by 10^11 (since we are currently working in 10^9)
-        emit amountToPay(amountOfTokens);
 
         if(priceChange > 0) {
             //Price has gone up, transfer from maker margin to taker margin
             if (_contract.makersMargin < amountOfTokens) {
-                liquidate(_contractId);
+                return liquidate(_contractId, true);
             }
+            //TODO Move tokens between margin accounts
+            contracts[_contractId].takersMargin = SafeMath.add(_contract.takersMargin, amountOfTokens);
+            contracts[_contractId].makersMargin = SafeMath.sub(_contract.makersMargin, amountOfTokens);
         } else {
             //Price has gone down, transfer from taker margin to maker margin
             if (_contract.takersMargin < amountOfTokens) {
-                liquidate(_contractId);
+                return liquidate(_contractId, false);
             }
-           //return npvCalcs(now, price, lastNPV.takersMargin, lastNPV.makersMargin, npv);
+            //TODO move tokens between margin accounts
+            contracts[_contractId].takersMargin = SafeMath.sub(_contract.takersMargin, amountOfTokens);
+            contracts[_contractId].makersMargin = SafeMath.add(_contract.makersMargin, amountOfTokens);
         }
+
+        // //TODO incoperate margin changes here
+        npvCalcs memory thisCalc = npvCalcs(now, price, contracts[_contractId].takersMargin, contracts[_contractId].makersMargin, scaledNpv);
+        contracts[_contractId].npvs.push(thisCalc);
+        contracts[_contractId].numNPV++;
+        return true;
     }
 
     /**
     * Function for recalculating contract terms and the margin accounts for a set contract
     */
-    function remargin(bytes32 _contractId, uint256 price) public returns(bool) {
+    function remargin(bytes32 _contractId) public returns(bool) {
         require(validContracts[_contractId], "You can only remargin a valid contract");
-        calcNPV(_contractId, price);
+        calcNPV(_contractId);
         return true;
-    }
-
-    function requestRemargin(bytes32 _contractID) public returns(bool) {
-        bytes32 jobID = "e0fc58dc839a42808c3c51186f6f8381";
-        requestEthereumPrice(_contractID, jobID); //make request to the SDL node
     }
 
     /**
     * Function for liquidating a contract
     */
-    function liquidate(bytes32 _contractId) public {
-        emit Liquidate(_contractId);
-        return;
+    function liquidate(bytes32 _contractId, bool maker) public returns(bool) {
+        //TODO
+        // uint minRequiredMargin = SafeMath.mul(SafeMath.div(SafeMath.mul(SafeMath.mul(_contract.amountOfLink,
+        //     _contract.npvs[_contract.numNPV - 1].price), _contract.requiredMargin), 100000), 10000000000);
+        if (maker) {
+            //Liquidate the maker
+            contracts[_contractId].takersMargin = SafeMath.add(contracts[_contractId].takersMargin,
+                contracts[_contractId].makersMargin);
+            contracts[_contractId].makersMargin = 0;
+            emit Liquidate(_contractId, contracts[_contractId].makerAddress);
+        } else {
+            //Liquidate the taker
+            contracts[_contractId].makersMargin = SafeMath.add(contracts[_contractId].makersMargin,
+                contracts[_contractId].takersMargin);
+            contracts[_contractId].takersMargin = 0;
+            emit Liquidate(_contractId, contracts[_contractId].takerAddress);
+        }
+        contracts[_contractId].active = false;
+        return true;
     }
 
     function abs(int256 num) public returns (uint256) {
@@ -325,7 +309,7 @@ contract LinkTRS is Ownable, ChainlinkClient {
     */
     function deposit(uint value, bytes32 _contractID) public returns (bool) {
         require(validContracts[_contractID], "Please use a valid contract ID");
-        emit AttemptTransfer(msg.sender, address(this), value);
+        //emit AttemptTransfer(msg.sender, address(this), value);
         require(token.transferFrom(msg.sender, address(this), value), "Token transfer must succeed");
         trsContract memory _contract = contracts[_contractID];
         if (msg.sender == _contract.takerAddress) {
@@ -341,8 +325,12 @@ contract LinkTRS is Ownable, ChainlinkClient {
     function withdraw(uint value, bytes32 _contractID) public returns(bool) {
         require(validContracts[_contractID], "Please use a valid contract ID");
         trsContract memory _contract = contracts[_contractID];
+        uint minRequiredMargin = SafeMath.mul(SafeMath.div(SafeMath.mul(SafeMath.mul(_contract.amountOfLink,
+            _contract.npvs[_contract.numNPV - 1].price), _contract.requiredMargin), 100000), 10000000000);
+
         if (msg.sender == _contract.takerAddress) {
             require(contracts[_contractID].takersMargin >= value, "You can only withdraw an amount you have deposited");
+            require(contracts[_contractID].takersMargin - value >= minRequiredMargin, "You cannot withdraw below the margin");
             //TODO two party vote to withdraw
             require(token.transfer(msg.sender, value), "Token transfer must succeed");
             //Decrement amount
@@ -350,6 +338,7 @@ contract LinkTRS is Ownable, ChainlinkClient {
             contracts[_contractID].takersMargin = SafeMath.sub(contracts[_contractID].takersMargin, value);
         } else {
             require(contracts[_contractID].makersMargin >= value, "You can only withdraw an amount you have deposited");
+            require(contracts[_contractID].makersMargin - value >= minRequiredMargin, "You cannot withdraw below the margin");
             //TODO two party vote to withdraw
             require(token.transfer(msg.sender, value), "Token transfer must succeed");
             //Decrement amount

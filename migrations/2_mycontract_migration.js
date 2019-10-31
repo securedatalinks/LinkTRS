@@ -12,18 +12,19 @@ module.exports = (deployer, network) => {
       })
     })
   } else if (network.startsWith("test")) {
-    deployer.deploy(DemoAggregator).then(() => {
-      return deployer.deploy(LinkToken).then(() => {
+    deployer.deploy(LinkToken).then(() => {
+      return deployer.deploy(DemoAggregator, LinkToken.address).then(() => {
         return deployer.deploy(LinkTRS, LinkToken.address, DemoAggregator.address, LinkToken.address)
       })
     })
   }
   else if (network.startsWith('ropsten')) {
-    deployer.deploy(DemoAggregator).then(() => {
-      return deployer.deploy(LinkToken).then(() => {
-        return deployer.deploy(LinkTRS, LinkToken.address, DemoAggregator.address, LinkToken.address)
+      deployer.deploy(DemoAggregator, "0x0000000000000000000000000000000000000000").then(() => {
+        return deployer.deploy(LinkToken).then(() => {
+          return deployer.deploy(LinkTRS, LinkToken.address, DemoAggregator.address, "0x0000000000000000000000000000000000000000")
+        })
       })
-    })
+      
   } else {
     // For live networks, use the 0 address to allow the ChainlinkRegistry
     // contract automatically retrieve the correct address for you
