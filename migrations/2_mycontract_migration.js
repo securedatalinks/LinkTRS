@@ -1,6 +1,7 @@
 let LinkToken = artifacts.require('LinkToken')
 let DemoAggregator = artifacts.require('DemoAggregator')
 let LinkTRS = artifacts.require('LinkTRS')
+let TestDAI = artifacts.require('TestDAI')
 
 module.exports = (deployer, network) => {
   // Local (development) networks need their own deployment of the LINK
@@ -12,19 +13,20 @@ module.exports = (deployer, network) => {
       })
     })
   } else if (network.startsWith("test")) {
-    deployer.deploy(LinkToken).then(() => {
-      return deployer.deploy(DemoAggregator, LinkToken.address).then(() => {
-        return deployer.deploy(LinkTRS, LinkToken.address, DemoAggregator.address, LinkToken.address)
+    //deployer.deploy(TestDAI)
+    deployer.deploy(TestDAI).then(() => {
+      return deployer.deploy(DemoAggregator, TestDAI.address).then(() => {
+        return deployer.deploy(LinkTRS, TestDAI.address, DemoAggregator.address, TestDAI.address)
       })
     })
   }
   else if (network.startsWith('ropsten')) {
-      deployer.deploy(DemoAggregator, "0x0000000000000000000000000000000000000000").then(() => {
-        return deployer.deploy(LinkToken).then(() => {
-          return deployer.deploy(LinkTRS, LinkToken.address, DemoAggregator.address, "0x0000000000000000000000000000000000000000")
-        })
+    deployer.deploy(TestDAI).then(() => {
+      return deployer.deploy(DemoAggregator, "0x0000000000000000000000000000000000000000").then(() => {
+        return deployer.deploy(LinkTRS, TestDAI.address, DemoAggregator.address, "0x0000000000000000000000000000000000000000")
       })
-      
+    })
+
   } else {
     // For live networks, use the 0 address to allow the ChainlinkRegistry
     // contract automatically retrieve the correct address for you
