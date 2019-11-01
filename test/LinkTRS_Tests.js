@@ -380,20 +380,62 @@ contract('LinkTRS', accounts => {
         await link.approve(linkTRS.address, web3.utils.toWei("100"), { from: acc2 })
         await linkTRS.joinContract(contractID, web3.utils.toWei("100"), { from: acc2 })
 
-        console.log("a")
         //Increase price 10 times (doubles value of contract)
         for (var i = 0; i < 10; i++) {
           await aggregator.increasePrice()
         }
-        console.log("b")
 
-
-        //Remargingin should now liquidate the maker
+        //Remargingin should now liquidate the maker fully
         await linkTRS.remargin(contractID)
-        console.log("c")
 
         var isActive = await linkTRS.isActive(contractID)
         assert.equal(isActive, false)
+
+        var contractID = await linkTRS.getUserContract(0);
+        var contractDetails = await linkTRS.getContractInfo(contractID)
+        console.log(contractDetails[7].toString())
+        console.log(contractDetails[8].toString())
+
+
+      })
+
+      it('transfers only partial funds on partial liquidation', async () => {
+        //Approve the contract to be allowed to deposit the required amount
+        await link.approve(linkTRS.address, web3.utils.toWei("210"));
+        //10% of $1000 is $100, therefore 100 tokens are required in the margin account
+
+        await linkTRS.createContract(
+          10,
+          5,
+          5000, //5%
+          10000, //10%
+          1000, //1000 tokens
+          web3.utils.toWei("210")
+        )
+        
+        var contractID = await linkTRS.getUserContract(0);
+
+        //Join contract
+        //Get user 2 to join the contract
+        await link.transfer(acc2, web3.utils.toWei("210"));
+        await link.approve(linkTRS.address, web3.utils.toWei("210"), { from: acc2 })
+        await linkTRS.joinContract(contractID, web3.utils.toWei("210"), { from: acc2 })
+
+        //Increase price 2 times (20% increase)
+        for (var i = 0; i < 2; i++) {
+          await aggregator.increasePrice()
+        }
+
+        //Remargingin should now liquidate the maker fully
+        await linkTRS.remargin(contractID)
+
+        var isActive = await linkTRS.isActive(contractID)
+        assert.equal(isActive, false)
+
+        var contractID = await linkTRS.getUserContract(0);
+        var contractDetails = await linkTRS.getContractInfo(contractID)
+        console.log(contractDetails[7].toString())
+        console.log(contractDetails[8].toString())
 
 
       })

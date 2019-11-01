@@ -188,7 +188,7 @@ contract LinkTRS is Ownable, ChainlinkClient {
         trsContract memory _contract = contracts[_contractID];
         return (_contract.takerAddress, _contract.makerAddress, _contract.originalPrice, _contract.startDate,
              _contract.expiryDate, _contract.interest, _contract.amountOfLink, _contract.takersMargin, _contract.makersMargin,
-             _contract.offerExpiryDate, _contract.numNPV);
+             _contract.requiredMargin, _contract.numNPV);
     }
 
     function isActive(bytes32 _contractID) public view returns (bool) {
@@ -234,10 +234,15 @@ contract LinkTRS is Ownable, ChainlinkClient {
         //emit npvUpdated(_contractId);
 
         //TODO Calc amount of tokens to transfer
+        return makeNPVTransfers(_contractId, priceChange, npv, scaledNpv, price);
+    }
+
+    function makeNPVTransfers(bytes32 _contractId, int256 priceChange, uint256 npv, uint256 scaledNpv, uint256 price) internal returns (bool) {
+        trsContract memory _contract = contracts[_contractId];
         //npv is excess to pay in $x.xx * 10^8.
         uint amountOfTokens = SafeMath.mul(SafeMath.div(SafeMath.div(SafeMath.mul(npv,1000),price), 1000), 10000000000);
-        //Now to convert to tokens (which are in 10^18), we need to multiply by 10^11 (since we are currently working in 10^9)
-
+        uint minRequiredMargin = SafeMath.mul(SafeMath.div(SafeMath.mul(SafeMath.mul(_contract.amountOfLink,
+            _contract.npvs[_contract.numNPV - 1].price), _contract.requiredMargin), 100000), 10000000000);
         if(priceChange > 0) {
             //Price has gone up, transfer from maker margin to taker margin
             if (_contract.makersMargin < amountOfTokens) {
@@ -246,6 +251,9 @@ contract LinkTRS is Ownable, ChainlinkClient {
             //TODO Move tokens between margin accounts
             contracts[_contractId].takersMargin = SafeMath.add(_contract.takersMargin, amountOfTokens);
             contracts[_contractId].makersMargin = SafeMath.sub(_contract.makersMargin, amountOfTokens);
+            if (contracts[_contractId].makersMargin < minRequiredMargin) {
+                contracts[_contractId].active = false;
+            }
         } else {
             //Price has gone down, transfer from taker margin to maker margin
             if (_contract.takersMargin < amountOfTokens) {
@@ -254,13 +262,15 @@ contract LinkTRS is Ownable, ChainlinkClient {
             //TODO move tokens between margin accounts
             contracts[_contractId].takersMargin = SafeMath.sub(_contract.takersMargin, amountOfTokens);
             contracts[_contractId].makersMargin = SafeMath.add(_contract.makersMargin, amountOfTokens);
+            if (contracts[_contractId].takersMargin < minRequiredMargin) {
+                contracts[_contractId].active = false;
+            }
         }
 
         // //TODO incoperate margin changes here
         npvCalcs memory thisCalc = npvCalcs(now, price, contracts[_contractId].takersMargin, contracts[_contractId].makersMargin, scaledNpv);
         contracts[_contractId].npvs.push(thisCalc);
         contracts[_contractId].numNPV++;
-        return true;
     }
 
     /**
@@ -268,6 +278,7 @@ contract LinkTRS is Ownable, ChainlinkClient {
     */
     function remargin(bytes32 _contractId) public returns(bool) {
         require(validContracts[_contractId], "You can only remargin a valid contract");
+        require(contracts[_contractId].active, "You can only remargin a active contract");
         calcNPV(_contractId);
         return true;
     }
@@ -277,8 +288,6 @@ contract LinkTRS is Ownable, ChainlinkClient {
     */
     function liquidate(bytes32 _contractId, bool maker) public returns(bool) {
         //TODO
-        // uint minRequiredMargin = SafeMath.mul(SafeMath.div(SafeMath.mul(SafeMath.mul(_contract.amountOfLink,
-        //     _contract.npvs[_contract.numNPV - 1].price), _contract.requiredMargin), 100000), 10000000000);
         if (maker) {
             //Liquidate the maker
             contracts[_contractId].takersMargin = SafeMath.add(contracts[_contractId].takersMargin,
@@ -336,7 +345,7 @@ contract LinkTRS is Ownable, ChainlinkClient {
             //Decrement amount
             users[msg.sender].deposited = SafeMath.sub(users[msg.sender].deposited, value);
             contracts[_contractID].takersMargin = SafeMath.sub(contracts[_contractID].takersMargin, value);
-        } else {
+        } else if (msg.sender == _contract.makerAddress) {
             require(contracts[_contractID].makersMargin >= value, "You can only withdraw an amount you have deposited");
             require(contracts[_contractID].makersMargin - value >= minRequiredMargin, "You cannot withdraw below the margin");
             //TODO two party vote to withdraw
